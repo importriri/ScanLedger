@@ -54,9 +54,9 @@ public final class Day {
         }
 
         static Result ok(Event e)                { return new Result(Kind.OK, "", 0, null, e); }
-        static Result unchanged(String why)      { return new Result(Kind.UNCHANGED, why, 0, null, null); }
-        static Result refused(String why)        { return new Result(Kind.REFUSED, why, 0, null, null); }
-        static Result io(IOException e)          {
+        public static Result unchanged(String why) { return new Result(Kind.UNCHANGED, why, 0, null, null); }
+        public static Result refused(String why) { return new Result(Kind.REFUSED, why, 0, null, null); }
+        public static Result io(IOException e)   {
             return new Result(Kind.IO_ERROR, "Il disco non scrive: " + e.getMessage(), 0, null, null);
         }
         static Result readOnly() {
@@ -193,6 +193,21 @@ public final class Day {
             return 0;
         }
         return 0;
+    }
+
+    /** The last addition as {n0, count} (a pair or a whole range), or null. */
+    public int[] lastAddition() {
+        if (additions.isEmpty()) return null;
+        int[] a = additions.get(additions.size() - 1);
+        return new int[] { a[0], a[1] };
+    }
+
+    /** Rows in the range that starts at n0 (1 for a scanned pair). */
+    public int additionSize(int n0) {
+        for (int i = additions.size() - 1; i >= 0; i--) {
+            if (additions.get(i)[0] == n0) return additions.get(i)[1];
+        }
+        return 1;
     }
 
     /** The live row holding this label, or null. */
@@ -424,11 +439,12 @@ public final class Day {
     static String badPair(String label, String lot) {
         if (label.isEmpty()) return "Etichetta vuota";
         if (lot.isEmpty()) return "Lotto vuoto";
-        if (hasControl(label) || hasControl(lot)) return "TAB o a capo dentro un codice";
+        if (hasControlChars(label) || hasControlChars(lot)) return "TAB o a capo dentro un codice";
         return null;
     }
 
-    static boolean hasControl(String s) {
+    /** TAB, CR or LF: refused at the scan, so they never reach a file. */
+    public static boolean hasControlChars(String s) {
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (c == '\t' || c == '\r' || c == '\n') return true;

@@ -59,10 +59,165 @@ public final class StartupSmokeTest {
               !main.isAlwaysOnTop());
         check("the window is painted in the theme",
               AppTheme.BASE.equals(main.getContentPane().getBackground()));
-        check("no panel is clipped by the window", nothingClipped(main));
+        // first start: the station name is asked before anything can be recorded
+        if (!saved) {
+            JDialog station = awaitDialog("Postazione", 4000);
+            check("the first start asks for the station name", station != null);
+            if (station instanceof StationDialog) {
+                StationDialog sd = (StationDialog) station;
+                SwingUtilities.invokeAndWait(() -> { sd.field.setText("L 2;"); sd.confirm(); });
+                check("a station name that cannot go in a file name is refused", sd.isShowing());
+                SwingUtilities.invokeAndWait(() -> { sd.field.setText("L2"); sd.confirm(); });
+                Thread.sleep(200);
+                check("a valid station name closes the question", !sd.isShowing());
+            }
+        }
+        check("the station name is in the title bar strip",
+              findLabelContaining(main, "L2") != null);
+
+        MainWindow mw = (MainWindow) main;
+        check("the window opens at least at 1100x680 (or the screen)",
+              main.getWidth() >= Math.min(1100, screen().width) && main.getHeight() >= Math.min(680, screen().height));
+        String theme = saved ? "Latte" : "Mocha";
+        sizeAndMeasure(main, mw, main.getSize(), theme + " at the default size");
+        sizeAndMeasure(main, mw, main.getMinimumSize(), theme + " at the minimum size");
+        SwingUtilities.invokeAndWait(() -> main.setSize(1100, 680));
+        Thread.sleep(200);
         check("no button is left blank (no text and no icon)", allButtonsReadable(main));
+        check("the disk pill is green and speaks", mw.pill().tone().equals(AppTheme.GREEN)
+              && mw.pill().getText() != null && !mw.pill().getText().isEmpty());
+        check("the scan field has the focus", waitFor(() -> mw.scanPanel.tfQr1.isFocusOwner(), 3000));
+
+        // a pair through the real startup path: the day is created at the first scan
+        SwingUtilities.invokeAndWait(() -> {
+            mw.scanPanel.tfQr1.setText("209531.001_01-01_2612000234");
+            mw.scanPanel.tfQr2.setText("900612202601310007");
+            mw.scanPanel.tfQr2.postActionEvent();
+        });
+        check("the first scan opens the day and records the pair",
+              mw.tablePanel.model().getRowCount() == 1);
+        java.io.File journals = new java.io.File(home.toFile(), "RegistroQR/giornate");
+        String[] names = journals.list();
+        check("the day journal is on disk in the data folder", names != null && names.length == 1);
+
+        // the settings: every tab measured, the dialog fits a 768 px screen
+        JButton gear = findByTooltip(main, "Impostazioni");
+        check("the gear button is in the header", gear != null);
+        if (gear != null) {
+            SwingUtilities.invokeAndWait(gear::doClick);
+            JDialog settings = awaitDialog("Impostazioni", 3000);
+            check("the gear opens the settings window", settings != null);
+            if (settings != null) {
+                check("the settings dialog fits a small screen", settings.getHeight() <= 760);
+                JTabbedPane tabs = findTabs(settings);
+                boolean allFit = tabs != null;
+                String[] want = { "Postazione", "Codici", "Suoni", "Cartelle", "Aspetto" };
+                for (String w : want) allFit &= hasTab(tabs, w);
+                check("the settings hold postazione, codici, suoni, cartelle, aspetto", allFit);
+                boolean noClip = tabs != null;
+                for (int i = 0; tabs != null && i < tabs.getTabCount(); i++) {
+                    final int idx = i;
+                    SwingUtilities.invokeAndWait(() -> tabs.setSelectedIndex(idx));
+                    Thread.sleep(120);
+                    if (!nothingClipped(settings)) {
+                        System.out.println("       clipped tab: " + tabs.getTitleAt(i));
+                        noClip = false;
+                    }
+                }
+                check("no settings tab is clipped", noClip);
+                check("no settings button is blank", allButtonsReadable(settings));
+                SwingUtilities.invokeAndWait(() -> settings.setVisible(false));
+            }
+        }
 
         report();
+    }
+
+    /** Both cards, at one window size: nothing may be clipped. */
+    private static void sizeAndMeasure(JFrame main, MainWindow mw, Dimension size, String what)
+            throws Exception {
+        SwingUtilities.invokeAndWait(() -> main.setSize(size));
+        Thread.sleep(250);
+        for (int card = 0; card < 2; card++) {
+            final int c = card;
+            SwingUtilities.invokeAndWait(() -> mw.modeSelector.select(c));
+            Thread.sleep(150);
+            check("no panel clipped: " + what + ", " + (c == 0 ? "Scansione" : "Intervallo"),
+                  nothingClipped(main));
+        }
+        SwingUtilities.invokeAndWait(() -> mw.modeSelector.select(0));
+    }
+
+    private static Dimension screen() {
+        Rectangle r = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
+        return r.getSize();
+    }
+
+    private static boolean waitFor(java.util.function.BooleanSupplier done, int timeoutMs)
+            throws Exception {
+        long until = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < until) {
+            if (done.getAsBoolean()) return true;
+            Thread.sleep(80);
+        }
+        return done.getAsBoolean();
+    }
+
+    private static JDialog awaitDialog(String title, int timeoutMs) throws Exception {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline) {
+            for (Window w : Window.getWindows()) {
+                if (w instanceof JDialog && w.isShowing() && title.equals(((JDialog) w).getTitle())) {
+                    return (JDialog) w;
+                }
+            }
+            Thread.sleep(100);
+        }
+        return null;
+    }
+
+    // isShowing: CardLayout keeps hidden cards in the tree, and a test once
+    // clicked a button the operator could not even see
+    private static JButton findByTooltip(Container root, String tip) {
+        for (Component c : root.getComponents()) {
+            if (c instanceof JButton && c.isShowing() && tip.equals(((JButton) c).getToolTipText())) {
+                return (JButton) c;
+            }
+            if (c instanceof Container) {
+                JButton b = findByTooltip((Container) c, tip);
+                if (b != null) return b;
+            }
+        }
+        return null;
+    }
+
+    private static JLabel findLabelContaining(Container root, String text) {
+        for (Component c : root.getComponents()) {
+            if (c instanceof JLabel && c.isShowing() && ((JLabel) c).getText() != null
+                && ((JLabel) c).getText().contains(text)) return (JLabel) c;
+            if (c instanceof Container) {
+                JLabel l = findLabelContaining((Container) c, text);
+                if (l != null) return l;
+            }
+        }
+        return null;
+    }
+
+    private static JTabbedPane findTabs(Container root) {
+        for (Component c : root.getComponents()) {
+            if (c instanceof JTabbedPane) return (JTabbedPane) c;
+            if (c instanceof Container) {
+                JTabbedPane t = findTabs((Container) c);
+                if (t != null) return t;
+            }
+        }
+        return null;
+    }
+
+    private static boolean hasTab(JTabbedPane t, String title) {
+        if (t == null) return false;
+        for (int i = 0; i < t.getTabCount(); i++) if (title.equals(t.getTitleAt(i))) return true;
+        return false;
     }
 
     // an operator who used the app before restarts with every setting in place

@@ -79,16 +79,52 @@ reopened on the same date (`_2`, `_3`...) continues the row and export numbers
 of the earlier ones, so `(station, date, export)` stays unique for AutoFillSuite
 and a row number never comes back meaning a different row.
 
+## The screen
+
+```
+MainWindow
+├── header      title + station, disk pill ("salvato su disco hh:mm:ss"), gear
+├── left 360 px Segmented SCANSIONE | INTERVALLO over a CardLayout
+│   ├── ScanPanel   QR 1, QR 2, outcome box, counter, undo, swap
+│   └── RangePanel  first label, lot, quantity, preview, overlap box
+├── right       TablePanel over RowTableModel (a view of Day, owns nothing)
+└── footer      journal file, events, data folder
+```
+
+- **Ledger** (core) holds the current day, creates it at the first scan after
+  a close, and is the only way the screen changes data: every command goes
+  through it, so the screen hears about every change and every failed write.
+- **The scanner** behaves exactly as in AutoFillSuite: ENTER on QR 1 moves to
+  QR 2, ENTER or TAB on QR 2 accepts. The TAB is caught by `ScanTabSupport`
+  only on the field marked with `scan.submitOnTab`.
+- **A refusal** (inverted, unknown shape, duplicate) keeps both fields full,
+  sounds the error and selects QR 1. The next scan overwrites QR 1, and QR 2 is
+  emptied **at once** — a deferred clear would wipe the new QR 2, because a fast
+  scanner has its keystrokes already queued.
+- **Duplicates are always refused** in the day: a second row for the same label
+  would be a silent correction on the portal. A lot is changed by editing.
+- **Enter and Canc** act on the table only while the table has the focus; every
+  action hands the caret back to QR 1. All buttons are `focusable(false)`.
+- **The disk pill** shows the time of the last forced write. A failed write
+  turns it red ("DISCO NON SCRIVE"), scanning stops, and a probe runs every two
+  seconds until the journal is writable again.
+- **Sizes are measured.** Scan fields have a fixed column count: a field sized
+  by its own text grew past the column with a long code, and GridBag then
+  dropped every row of the card to its minimum (the range preview went to 1 px).
+
 ## Tests
 
 | Suite | What it pins down | Why it exists |
 |---|---|---|
 | JournalTest | round trip of every event type; every edit rule; cut at every byte = exact prefix; corruption = read only + copy; lock | the promise "nothing lost however it is closed" |
 | CrashTest | 20 forced kills of a writing JVM: every confirmed pair is on disk, at most one more | proves the promise with a real process kill |
+| RangesTest | moving digits, refusal past 999 | AutoFillSuite's 998 + 5 = 1000, 1001 |
+| RowTableModelTest | newest on top, every state word, filter counts, search; follows every event | — (the table is a view of the journal) |
+| ScanFlowTest | the real window driven like the scanner: ENTER, TAB, free-text lot, duplicate, inversion + F2, mismatch, range, Ctrl+Z, edits; table and journal checked after every step | a deferred clear that would have wiped the next QR 2 |
 | ScanGuardTest | inversion vs mismatch (AutoFillSuite cases) | the lot scanned into QR 1 |
 | GlyphSafetyTest | no typed symbol in UI strings or manuals | empty boxes on Windows |
 | IconRenderTest | icons as pixels, the gear hub is a hole | a black disc from AlphaComposite.Clear |
 | SpinnerCommitTest | on-screen number = model number | "chose 20, printed 30" |
 | ScanTabSupportTest | TAB on the marked QR 2 = ENTER, nothing else; a third field breaks nothing | the scanner's TAB suffix |
 | TextFitTest | overflow keeps the tail | unreadable final digits |
-| StartupSmokeTest (x2) | the real app under Xvfb, first start and saved settings | a window that compiles and shows nothing |
+| StartupSmokeTest (x2) | the real app under Xvfb: station asked at first start, no clipping on both cards at default and minimum size, both themes, settings tabs, first scan creates the day | the range preview squashed to 1 px by a field sized by its text |

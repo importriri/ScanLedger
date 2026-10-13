@@ -36,6 +36,9 @@ xvfb-run -a bash -eu -o pipefail <<'TESTS'
 java -cp out app.core.ScanGuardTest
 java -cp out app.core.JournalTest
 java -cp out app.core.CrashTest
+java -cp out app.core.RangesTest
+java -cp out app.ui.RowTableModelTest
+java -cp out app.ui.ScanFlowTest
 java -cp out app.ui.GlyphSafetyTest
 java -cp out app.ui.IconRenderTest
 java -cp out app.ui.SpinnerCommitTest
@@ -43,6 +46,9 @@ java -cp out app.ui.ScanTabSupportTest
 java -cp out app.ui.TextFitTest
 java -cp out app.ui.StartupSmokeTest
 java -cp out app.ui.StartupSmokeTest --saved
+# pictures of the screens, to look at: out/snapshot/*.png
+java -cp out app.ui.Snapshot mocha out/snapshot
+java -cp out app.ui.Snapshot latte out/snapshot
 TESTS
 
 ant -q clean jar
