@@ -34,6 +34,8 @@ javac --release 8 -Xlint:all,-options,-serial,-this-escape -Werror \
 
 xvfb-run -a bash -eu -o pipefail <<'TESTS'
 java -cp out app.core.ScanGuardTest
+java -cp out app.core.JournalTest
+java -cp out app.core.CrashTest
 java -cp out app.ui.GlyphSafetyTest
 java -cp out app.ui.IconRenderTest
 java -cp out app.ui.SpinnerCommitTest
