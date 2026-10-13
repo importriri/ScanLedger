@@ -1,0 +1,22 @@
+# Build output
+build/
+dist/
+
+# Local test build output (CI uses out/)
+out/
+
+# NetBeans private settings
+nbproject/private/
+
+# Working notes and starting material, kept outside the repository
+STATO.md
+CLAUDE.md
+contratto/
+registro-qr-mockup.html
+
+# User configuration lives in user.home and never belongs in the repository
+.registro_qr.properties
+
+# OS
+.DS_Store
+Thumbs.db

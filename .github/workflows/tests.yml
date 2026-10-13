@@ -1,0 +1,27 @@
+name: tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: install build and display tools
+        run: sudo apt-get update && sudo apt-get install -y ant xvfb
+
+      - name: verify source and standalone jar
+        run: ./verify.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ScanLedger-jar
+          path: dist/ScanLedger.jar
+          if-no-files-found: error
+          retention-days: 14

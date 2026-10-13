@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="ScanLedger-impl" default="run" basedir="..">
+
+    <property file="nbproject/project.properties"/>
+
+    <target name="-init">
+        <mkdir dir="${build.classes.dir}"/>
+        <mkdir dir="${dist.dir}"/>
+        <mkdir dir="${build.test.classes.dir}"/>
+    </target>
+
+    <target name="compile" depends="-init" description="Compile sources">
+        <javac srcdir="${src.dir}"
+               destdir="${build.classes.dir}"
+               source="${javac.source}"
+               target="${javac.target}"
+               encoding="${source.encoding}"
+               includeantruntime="false"
+               debug="true"
+               classpath="${javac.classpath}"/>
+        <!-- javac only compiles: the manuals under src/app/docs are read from
+             the classpath by the settings window, so they have to be copied
+             next to the classes or the JAR ships without them -->
+        <copy todir="${build.classes.dir}">
+            <fileset dir="${src.dir}" excludes="**/*.java"/>
+        </copy>
+    </target>
+
+    <target name="jar" depends="compile" description="Build JAR">
+        <jar destfile="${dist.jar}" basedir="${build.classes.dir}">
+            <manifest>
+                <attribute name="Main-Class" value="${main.class}"/>
+            </manifest>
+        </jar>
+    </target>
+
+    <target name="run" depends="compile" description="Run application">
+        <java classname="${main.class}" fork="true" failonerror="true">
+            <classpath>
+                <pathelement location="${build.classes.dir}"/>
+            </classpath>
+            <jvmarg line="${run.jvmargs}"/>
+        </java>
+    </target>
+
+    <target name="debug" depends="compile" description="Debug application">
+        <nbjpdastart addressproperty="jpda.address" name="ScanLedger" transport="dt_socket">
+            <classpath><pathelement location="${build.classes.dir}"/></classpath>
+        </nbjpdastart>
+        <java classname="${main.class}" fork="true">
+            <classpath><pathelement location="${build.classes.dir}"/></classpath>
+            <jvmarg value="-Xdebug"/>
+            <jvmarg value="-Xrunjdwp:transport=dt_socket,address=${jpda.address}"/>
+        </java>
+    </target>
+
+    <target name="clean" description="Clean build artifacts">
+        <delete dir="${build.dir}"/>
+        <delete dir="${dist.dir}"/>
+    </target>
+
+    <target name="clean-and-build" depends="clean,jar"/>
+
+    <target name="test" depends="compile"/>
+
+    <target name="test-single" depends="compile"/>
+
+</project>
