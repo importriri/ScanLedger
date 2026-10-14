@@ -66,7 +66,7 @@ final class Widgets {
      * The outcome box: a bordered, tinted plate with a big title and a mono
      * detail line. Text is set through {@link #show}; the detail keeps its tail.
      */
-    static final class ResultBox extends JPanel {
+    static class ResultBox extends JPanel {
         private final JLabel title = new JLabel(" ", SwingConstants.CENTER);
         private final JLabel detail = new JLabel(" ", SwingConstants.CENTER);
         private Color line = AppTheme.SURFACE1;

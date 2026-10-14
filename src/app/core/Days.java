@@ -2,7 +2,6 @@ package app.core;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -122,20 +121,25 @@ public final class Days {
         return new Day.Init(station, date, nBase, exportBase);
     }
 
-    /** Reads only the end of the file: is the last whole event a CHIUDI? */
+    /**
+     * Is there a CHIUDI event in the file? Not only the last line: a closed
+     * day still records late copies and re-exports after it.
+     */
     static boolean endsClosed(File f) {
-        try (RandomAccessFile raf = new RandomAccessFile(f, "r")) {
-            long len = raf.length();
-            int n = (int) Math.min(len, 4096);
-            byte[] buf = new byte[n];
-            raf.seek(len - n);
-            raf.readFully(buf);
-            String tail = new String(buf, StandardCharsets.UTF_8);
-            int end = tail.lastIndexOf('\n');
-            if (end < 0) return false;
-            int start = tail.lastIndexOf('\n', end - 1) + 1;
-            Event e = Journal.decode(tail.substring(start, end));
-            return e != null && e.type == Event.Type.CHIUDI;
+        try {
+            byte[] all = java.nio.file.Files.readAllBytes(f.toPath());
+            String text = new String(all, StandardCharsets.UTF_8);
+            int at = text.indexOf("\tCHIUDI\t");
+            while (at >= 0) {
+                int start = text.lastIndexOf('\n', at) + 1;
+                int end = text.indexOf('\n', at);
+                if (end > 0) {
+                    Event e = Journal.decode(text.substring(start, end));
+                    if (e != null && e.type == Event.Type.CHIUDI) return true;
+                }
+                at = text.indexOf("\tCHIUDI\t", at + 1);
+            }
+            return false;
         } catch (IOException e) {
             return false;
         }

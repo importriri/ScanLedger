@@ -37,6 +37,11 @@ java -cp out app.core.ScanGuardTest
 java -cp out app.core.JournalTest
 java -cp out app.core.CrashTest
 java -cp out app.core.RangesTest
+java -cp out app.core.CsvWriterTest
+java -cp out app.core.CsvReaderTest
+java -cp out app.core.ExporterTest
+java -cp out app.core.RegenerateTest
+java -cp out app.core.DayLifecycleTest
 java -cp out app.ui.RowTableModelTest
 java -cp out app.ui.ScanFlowTest
 java -cp out app.ui.GlyphSafetyTest

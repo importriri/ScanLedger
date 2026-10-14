@@ -112,6 +112,51 @@ public final class Snapshot {
             return d;
         }, new File(outDir, flavor + "-04b-modifica-esportata.png"));
 
+        // 06: the export, before and after (the copy folder is missing: pending)
+        Settings.getInstance().set(Settings.DIR_COPY, new File(home.toFile(), "chiavetta").getPath());
+        final ExportDialog[] ex = new ExportDialog[1];
+        SwingUtilities.invokeAndWait(() -> {
+            ex[0] = new ExportDialog(win, ledger, false);
+            try {
+                paint(ex[0].getContentPane(), new File(outDir, flavor + "-06-esporta.png"));
+                ex[0].doExport();
+                ex[0].pack();
+                paint(ex[0].getContentPane(), new File(outDir, flavor + "-06b-esportato.png"));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            ex[0].dispose();
+        });
+        shoot(win, new File(outDir, flavor + "-06c-copia-in-sospeso.png"));
+
+        // 10: history, after a regeneration
+        SwingUtilities.invokeAndWait(() -> win.openSettings("Storico"));
+        Thread.sleep(300);
+        SwingUtilities.invokeAndWait(() -> {
+            win.settingsWindow().showTab("Storico");
+            win.history.regenerateInto = new File(home.toFile(), "rigenerati");
+            win.history.regenerate();
+            try {
+                paint(win.settingsWindow().getContentPane(), new File(outDir, flavor + "-10-storico.png"));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        // 05: the restart after a crash, the next morning, yesterday not exported
+        clock.set("2026-10-14T06:30:00");
+        SwingUtilities.invokeAndWait(() -> {
+            win.settingsWindow().setVisible(false);
+            ledger.add(P + "95", "900612202601310120");
+        });
+        final MainWindow[] w2 = new MainWindow[1];
+        SwingUtilities.invokeAndWait(() -> {
+            w2[0] = new MainWindow(ledger, true);
+            w2[0].setSize(MainWindow.DEFAULT_W, MainWindow.DEFAULT_H);
+            w2[0].validate();
+        });
+        shoot(w2[0], new File(outDir, flavor + "-05-ripresa.png"));
+
         // 09: settings
         SwingUtilities.invokeAndWait(() -> win.openSettings("Codici"));
         Thread.sleep(300);

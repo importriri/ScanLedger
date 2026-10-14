@@ -90,6 +90,7 @@ public final class Day {
     private final List<ExportRecord> exports = new ArrayList<>();
     private int maxN;
     private int eventCount;
+    private String lastTs = "";
     private boolean closed;
     private final boolean corrupted;
     private final List<Consumer<Event>> listeners = new ArrayList<>();
@@ -115,9 +116,9 @@ public final class Day {
             for (Event e : r.events) d.apply(e);
             return d;
         }
-        boolean closedFile = false;
-        for (Event e : r.events) if (e.type == Event.Type.CHIUDI) closedFile = true;
-        Journal j = closedFile ? null : Journal.openForAppend(file, r, clock);
+        // a closed day still opens its journal: its rows are frozen, but a
+        // late backup copy or a re-export of the whole day is still recorded
+        Journal j = Journal.openForAppend(file, r, clock);
         Day d = new Day(file, j, r, false);
         for (Event e : r.events) d.apply(e);
         if (r.events.isEmpty() && j != null) {
@@ -158,9 +159,21 @@ public final class Day {
     public boolean isClosed()      { return closed; }
     public boolean isCorrupted()   { return corrupted; }
     public boolean isReadOnly()    { return corrupted || closed || (journal == null && file != null); }
+
+    /** Live rows, n order: what a re-export carries. */
+    public List<Integer> liveRows() {
+        List<Integer> out = new ArrayList<>();
+        for (Row r : rows.values()) if (!r.deleted) out.add(r.n);
+        return out;
+    }
     public int eventCount()        { return eventCount; }
     public Journal journal()       { return journal; }
     public Journal.Replay replay() { return replay; }
+
+    /** Timestamp of the last event (ms precision), or "" for an empty day. */
+    public String lastEventTs() {
+        return lastTs;
+    }
 
     /** All rows, in n order. */
     public List<Row> rows() {
@@ -382,7 +395,7 @@ public final class Day {
     /** The export file is on disk and verified: record it. */
     public Result recordExport(int number, String created, String sha256, String fileName,
                                boolean reexport, List<Integer> ns) {
-        Result pre = writable();
+        Result pre = reexport ? archivable() : writable();
         if (pre != null) return pre;
         StringBuilder list = new StringBuilder();
         for (Integer n : ns) {
@@ -395,7 +408,7 @@ public final class Day {
     }
 
     public Result recordCopy(int number, String folder, boolean ok, String reason) {
-        Result pre = writable();
+        Result pre = archivable();
         if (pre != null) return pre;
         return write(Event.Type.COPIA, String.valueOf(number), folder,
                      ok ? "OK" : "FALLITA", reason == null ? "" : clean(reason));
@@ -417,6 +430,12 @@ public final class Day {
 
     private Result writable() {
         if (corrupted || closed || journal == null) return Result.readOnly();
+        return null;
+    }
+
+    /** Copies and re-exports change no row: a closed day still takes them. */
+    private Result archivable() {
+        if (corrupted || journal == null) return Result.readOnly();
         return null;
     }
 
@@ -455,6 +474,7 @@ public final class Day {
     /** Applies an event already on disk. Tolerant: a nonsensical event changes nothing. */
     private void apply(Event e) {
         eventCount++;
+        lastTs = e.ts;
         try {
             switch (e.type) {
                 case APRI:
@@ -548,16 +568,7 @@ public final class Day {
         if (!list.isEmpty()) {
             for (String s : list.split(",")) ns.add(Integer.parseInt(s.trim()));
         }
-        List<ExportRecord.Line> lines = new ArrayList<>();
-        for (Integer n : ns) {
-            Row r = rows.get(n);
-            if (r == null) continue;
-            boolean correction = !reexport && r.everExported();
-            String ora = correction && r.correctedAt != null ? r.correctedAt : r.created;
-            lines.add(new ExportRecord.Line(r.n, r.label, r.lot, ora, r.mode,
-                correction ? "CORREZIONE" : "NUOVA", r.modified,
-                correction ? r.exportedLot : ""));
-        }
+        List<ExportRecord.Line> lines = linesFor(new ArrayList<>(ns), reexport);
         exports.add(new ExportRecord(number, e.field(1), e.field(2), e.field(3),
                                      reexport, e.seq, e.ts, lines));
         if (reexport) return;   // a re-export changes no state
@@ -568,6 +579,26 @@ public final class Day {
             r.lastExport = number;
             r.correctedAt = null;
         }
+    }
+
+    /**
+     * The CSV lines rows n would go out with NOW. The one definition: the
+     * exporter writes these, and a replay builds the same lines at each
+     * ESPORTA event — which is why a regenerated file is byte-identical.
+     */
+    public List<ExportRecord.Line> linesFor(List<Integer> ns, boolean reexport) {
+        List<Integer> sorted = new ArrayList<>(new TreeSet<>(ns));
+        List<ExportRecord.Line> lines = new ArrayList<>();
+        for (Integer n : sorted) {
+            Row r = rows.get(n);
+            if (r == null) continue;
+            boolean correction = !reexport && r.everExported();
+            String ora = correction && r.correctedAt != null ? r.correctedAt : r.created;
+            lines.add(new ExportRecord.Line(r.n, r.label, r.lot, ora, r.mode,
+                correction ? "CORREZIONE" : "NUOVA", r.modified,
+                correction ? r.exportedLot : ""));
+        }
+        return lines;
     }
 
     private static int parseInt(String s, int def) {

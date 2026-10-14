@@ -2,6 +2,7 @@ package app.ui;
 
 import app.config.Settings;
 import app.core.Day;
+import app.core.Journal;
 import app.core.Ledger;
 import app.core.Row;
 import app.core.StationRule;
@@ -48,10 +49,21 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
     private final JLabel footLeft = new JLabel();
     final JLabel footRight = new JLabel();
     private SettingsWindow settingsWindow;
+    HistoryPanel history;
+
+    private final boolean uncleanExit;
+    JButton btnExport;
+    JButton btnCloseDay;
+    private Banner copyBanner;
 
     public MainWindow(Ledger ledger) {
+        this(ledger, false);
+    }
+
+    public MainWindow(Ledger ledger, boolean uncleanExit) {
         super("Registro QR");
         this.ledger = ledger;
+        this.uncleanExit = uncleanExit;
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
 
         scanPanel = new ScanPanel(ledger, this);
@@ -94,6 +106,7 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
         });
 
         ledger.addListener(this::ledgerChanged);
+        startupBanners();
         refreshChrome();
 
         // measured, then the default size on top: never smaller than the content asks
@@ -147,9 +160,17 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
         return header;
     }
 
-    /** Extra header actions: none yet in the base window. */
+    /** Export and day closing, next to the pill. */
     void headerButtons(JPanel east) {
-        // export and day closing join here
+        btnExport = AppTheme.button("Esporta CSV", AppTheme.MAUVE);
+        btnExport.setIcon(Icons.export(AppTheme.ICON, AppTheme.ON_ACCENT));
+        btnExport.setToolTipText("Scrive un CSV con le righe nuove e le correzioni");
+        btnExport.addActionListener(e -> openExport(false));
+        btnCloseDay = AppTheme.ghost("Chiudi giornata");
+        btnCloseDay.setToolTipText("Archivia la giornata: la prossima coppia ne apre una nuova");
+        btnCloseDay.addActionListener(e -> closeDay());
+        east.add(btnExport);
+        east.add(btnCloseDay);
     }
 
     private JPanel buildColumns() {
@@ -201,6 +222,7 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
     // ── state ────────────────────────────────────────────────────────────
 
     private void ledgerChanged() {
+        refreshCopyBanner();
         refreshChrome();
         scanPanel.ledgerChanged();
         rangePanel.update();
@@ -221,6 +243,146 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
         boolean bad = !ledger.diskOk() || (d != null && d.isCorrupted());
         footLeft.setForeground(bad ? AppTheme.RED : AppTheme.GREEN);
         footLeft.setIcon(Icons.dot(10, bad ? AppTheme.RED : AppTheme.GREEN));
+
+        String right = "nessun export oggi";
+        if (d != null && !d.exports().isEmpty()) {
+            app.core.ExportRecord x = d.exports().get(d.exports().size() - 1);
+            String copy = x.copyPending() ? "copia IN SOSPESO"
+                        : "OK".equals(x.copyOutcome()) ? "copia OK" : "nessuna copia";
+            right = "export " + String.format("%02d", x.number) + " alle " + x.created.substring(11, 16)
+                  + "  -  " + copy;
+        }
+        footRight.setText(right);
+        footRight.setForeground(right.contains("SOSPESO") ? AppTheme.YELLOW : AppTheme.OVERLAY);
+        boolean writable = d != null && !d.isReadOnly();
+        if (btnExport != null) {
+            btnExport.setEnabled(d != null && (d.isCorrupted() || !d.pendingExport().isEmpty()));
+            btnCloseDay.setEnabled(writable);
+        }
+    }
+
+    // ── export, closing, banners ─────────────────────────────────────────
+
+    void openExport(boolean reexport) {
+        ExportDialog d = new ExportDialog(this, ledger, reexport);
+        d.setVisible(true);
+        focusScan();
+    }
+
+    void closeDay() {
+        Day d = ledger.day();
+        if (d == null || d.isReadOnly()) return;
+        int nw = d.pendingNew(), corr = d.pendingCorrections();
+        if (nw > 0 || corr > 0) {
+            Object[] options = { "Esporta adesso", "Annulla" };
+            int c = JOptionPane.showOptionDialog(this,
+                "Prima di chiudere bisogna esportare: " + nw + " righe nuove, " + corr + " correzioni.",
+                "Chiudi giornata", JOptionPane.DEFAULT_OPTION, JOptionPane.WARNING_MESSAGE,
+                null, options, options[0]);
+            if (c == 0) openExport(false);
+            return;
+        }
+        int c = JOptionPane.showConfirmDialog(this,
+            "Chiudere la giornata del " + ExportDialog.dm(d.date()) + " (" + d.liveCount() + " coppie)?\n"
+            + "Diventa di sola lettura; la prossima coppia apre una giornata nuova.",
+            "Chiudi giornata", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
+        if (c != JOptionPane.OK_OPTION) return;
+        Day.Result r = ledger.closeDay();
+        if (r.ok()) {
+            Sounds.ok();
+            clearDayBanners();
+        } else {
+            Sounds.error();
+            JOptionPane.showMessageDialog(this, r.message, "Chiudi giornata", JOptionPane.WARNING_MESSAGE);
+        }
+        focusScan();
+    }
+
+    /** What the start found: a restart after a crash, a torn line, a recovered export, old days. */
+    private void startupBanners() {
+        Day d = ledger.day();
+        if (d != null && d.isCorrupted()) {
+            Journal.Replay r = d.replay();
+            addBanner(new Banner(AppTheme.RED, "Giornale danneggiato: giornata in sola lettura",
+                "Copia del file in " + (r.corruptCopy == null ? "-" : r.corruptCopy.getName())
+                + ". Si leggono " + d.rowCount() + " righe: esportale, poi chiudi.")
+                .action("Esporta righe leggibili", true, false, () -> openExport(true)));
+        }
+        if (uncleanExit && d != null && !d.isCorrupted()) {
+            String last = d.lastEventTs().length() >= 19 ? d.lastEventTs().substring(11, 19) : "-";
+            addBanner(new Banner(AppTheme.BLUE, "Ripresa giornata del " + ExportDialog.dm(d.date())
+                + " — " + d.liveCount() + " coppie, nessuna persa",
+                "Il programma non era stato chiuso normalmente (ultimo evento " + last
+                + "). Tabella ricostruita dal giornale: puoi continuare a sparare.")
+                .action("Ok", false, true, this::focusScan));
+        }
+        if (d != null && d.replay() != null && d.replay().hasDiscardedTail()) {
+            Journal.Replay r = d.replay();
+            String what = r.discardedLabel == null ? "una riga incompleta"
+                        : r.discardedLabel + (r.discardedLot == null ? "" : "  -  " + r.discardedLot);
+            addBanner(new Banner(AppTheme.PEACH, "Ultima coppia scartata: " + what,
+                "Il PC si è spento mentre la scriveva: sparala di nuovo.")
+                .action("Ok", false, true, this::focusScan));
+        }
+        for (String name : ledger.recovered()) {
+            addBanner(new Banner(AppTheme.BLUE, "Export recuperato: " + name,
+                "Il PC si era spento subito dopo averlo scritto: ora è registrato nel giornale.")
+                .action("Ok", false, true, this::focusScan));
+        }
+        if (d != null && !d.isCorrupted()
+                && d.date().compareTo(java.time.LocalDate.now(ledger.clock()).toString()) < 0) {
+            int pending = d.pendingExport().size();
+            if (pending > 0) {
+                addBanner(new Banner(AppTheme.PEACH, "Il " + ExportDialog.dm(d.date())
+                    + " non è stato esportato: " + pending + " coppie",
+                    "Esporta prima di andare avanti, oppure tienilo per dopo: la giornata resta aperta.")
+                    .action("Esporta " + ExportDialog.dm(d.date()), true, true, () -> openExport(false))
+                    .action("Più tardi", false, true, this::focusScan));
+            } else {
+                addBanner(new Banner(AppTheme.PEACH, "La giornata del " + ExportDialog.dm(d.date())
+                    + " è ancora aperta",
+                    "Chiudila per iniziare quella di oggi: finché è aperta le coppie nuove vanno lì.")
+                    .action("Chiudi giornata", true, true, this::closeDay)
+                    .action("Più tardi", false, true, this::focusScan));
+            }
+        }
+        refreshCopyBanner();
+    }
+
+    private void addBanner(Banner b) {
+        b.setAlignmentX(Component.LEFT_ALIGNMENT);
+        banners.add(b);
+        banners.revalidate();
+    }
+
+    private void clearDayBanners() {
+        for (Component c : banners.getComponents()) if (c != copyBanner) banners.remove(c);
+        banners.revalidate();
+        banners.repaint();
+    }
+
+    /** The copy that is waiting for its folder stays on screen until it succeeds. */
+    private void refreshCopyBanner() {
+        java.util.List<Ledger.PendingCopy> pending = ledger.pendingCopies();
+        if (copyBanner != null) {
+            banners.remove(copyBanner);
+            copyBanner = null;
+        }
+        if (!pending.isEmpty()) {
+            Ledger.PendingCopy first = pending.get(0);
+            copyBanner = new Banner(AppTheme.YELLOW, "COPIA IN SOSPESO — " + pending.size()
+                + (pending.size() == 1 ? " export" : " export"),
+                ExportDialog.dm(first.date) + " export " + String.format("%02d", first.number) + ": "
+                + first.reason + ". Riprovo a ogni avvio e a ogni export.")
+                .action("Riprova ora", false, false, () -> {
+                    ledger.retryAllCopies();
+                    ledger.fireChanged();
+                });
+            copyBanner.setAlignmentX(Component.LEFT_ALIGNMENT);
+            banners.add(copyBanner);
+        }
+        banners.revalidate();
+        banners.repaint();
     }
 
     private void refreshPill() {
@@ -278,7 +440,12 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
     }
 
     void openSettings(String tab) {
-        if (settingsWindow == null) settingsWindow = new SettingsWindow(this, this::settingsChanged);
+        if (settingsWindow == null) {
+            settingsWindow = new SettingsWindow(this, this::settingsChanged);
+            history = new HistoryPanel(ledger);
+            settingsWindow.addPage("Storico", history, false);
+        }
+        if ("Storico".equals(tab) || tab == null) history.reload();
         if (tab != null) settingsWindow.showTab(tab);
         settingsWindow.setVisible(true);
         settingsWindow.toFront();

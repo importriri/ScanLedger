@@ -79,6 +79,53 @@ reopened on the same date (`_2`, `_3`...) continues the row and export numbers
 of the earlier ones, so `(station, date, export)` stays unique for AutoFillSuite
 and a row number never comes back meaning a different row.
 
+## Export, archive, backup
+
+`Exporter` writes, in this order, so that every crash leaves something
+recoverable:
+
+1. the new rows and the pending corrections, by `n` (nothing: no file);
+2. `registro_<station>_<date>_<NN>.csv.tmp`, forced, renamed atomically;
+3. the file **read back** with `CsvReader`: valid and exactly those rows, or it
+   is deleted and nothing is recorded;
+4. the `ESPORTA` event: the rows become exported;
+5. the copy folder (and the day journal with it), with a `COPIA` event either
+   way. A failed copy stays **pending** and is retried at every start and every
+   export, on screen until it succeeds.
+
+**The gap between 2 and 4.** If the PC goes off after the rename and before the
+event, the file exists and the journal does not know it. At the next start
+`recoverMissing` looks for files of the day numbered past the last recorded
+export; when one is valid and its rows are exactly the rows still pending, the
+missing event is recorded and the screen says so. Leftover `.tmp` files are
+removed (they were never exports).
+
+**The archive never loses a file.** Nothing in the export folder is ever
+overwritten or deleted: a name already there is an error.
+
+**Regeneration.** The journal replayed up to an `ESPORTA` event rebuilds the
+same lines with the same function the exporter used (`Day.linesFor`), so the
+file comes back byte for byte; the fingerprint must equal the one the event
+recorded, otherwise the journal does not match what went out and that is a
+serious error.
+
+**Re-export.** Every live row with its current value, all `NUOVA`,
+`riesportazione=1`, a new number, no state change. A closed day still records
+a re-export and a late copy (its rows stay frozen). A damaged, read-only day
+exports its readable rows as a re-export it cannot record.
+
+**The CSV.** `CsvWriter` and `CsvReader` are pure and follow
+`docs/CSV-FORMAT.md`; `CsvWriterTest` rebuilds both contract samples byte for
+byte from a day built with the same events. AutoFillSuite carries a copy of the
+reader, tested on the same five samples.
+
+## Days and restarts
+
+A clean exit clears a marker in the settings; a start that finds it set shows
+"Ripresa giornata — N coppie, nessuna persa". A torn last line is shown with
+its label and lot to scan again; an open day from an earlier date asks to be
+exported or closed; closing needs nothing left to export.
+
 ## The screen
 
 ```
@@ -117,10 +164,15 @@ MainWindow
 | Suite | What it pins down | Why it exists |
 |---|---|---|
 | JournalTest | round trip of every event type; every edit rule; cut at every byte = exact prefix; corruption = read only + copy; lock | the promise "nothing lost however it is closed" |
-| CrashTest | 20 forced kills of a writing JVM: every confirmed pair is on disk, at most one more | proves the promise with a real process kill |
+| CrashTest | 20 forced kills of a writing JVM: every confirmed pair is on disk, at most one more; 10 kills mid-export: every file has its event, every event its file | proves the promise with a real process kill |
 | RangesTest | moving digits, refusal past 999 | AutoFillSuite's 998 + 5 = 1000, 1001 |
 | RowTableModelTest | newest on top, every state word, filter counts, search; follows every event | — (the table is a view of the journal) |
 | ScanFlowTest | the real window driven like the scanner: ENTER, TAB, free-text lot, duplicate, inversion + F2, mismatch, range, Ctrl+Z, edits; table and journal checked after every step | a deferred clear that would have wiped the next QR 2 |
+| CsvWriterTest | the two contract samples rebuilt byte for byte from a day | — (the contract, shared with AutoFillSuite) |
+| CsvReaderTest | the five samples with their outcome; BOM, LF, format 2, columns, duplicate n, field rules | Excel resaving a file, a file cut in transit |
+| ExporterTest | incremental exports with corrections, read-back, no overwrite, pending copy retried, crash between rename and event, re-export, read-only day | the gap between the rename and the event |
+| RegenerateTest | three exports and a re-export rebuilt identical from the journal; a forged journal is refused | "if the operator loses the files, nothing is lost" |
+| DayLifecycleTest | first scan opens the day, closing, `_2`, past midnight, stale day, closed day takes copies and re-exports, restart | shifts across midnight |
 | ScanGuardTest | inversion vs mismatch (AutoFillSuite cases) | the lot scanned into QR 1 |
 | GlyphSafetyTest | no typed symbol in UI strings or manuals | empty boxes on Windows |
 | IconRenderTest | icons as pixels, the gear hub is a hole | a black disc from AlphaComposite.Clear |

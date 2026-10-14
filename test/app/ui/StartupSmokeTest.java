@@ -72,6 +72,16 @@ public final class StartupSmokeTest {
                 check("a valid station name closes the question", !sd.isShowing());
             }
         }
+        check("the header offers Esporta CSV and Chiudi giornata",
+              findButton(main, "Esporta CSV") != null && findButton(main, "Chiudi giornata") != null);
+        if (saved) {
+            check("a restart after a crash says the day was rebuilt, nothing lost",
+                  findLabelContaining(main, "Ripresa giornata") != null
+                  && findLabelContaining(main, "nessuna persa") != null);
+            check("the torn last pair is named so it can be scanned again",
+                  findLabelContaining(main, "Ultima coppia scartata") != null
+                  && findLabelContaining(main, "2612000299") != null);
+        }
         check("the station name is in the title bar strip",
               findLabelContaining(main, "L2") != null);
 
@@ -94,8 +104,9 @@ public final class StartupSmokeTest {
             mw.scanPanel.tfQr2.setText("900612202601310007");
             mw.scanPanel.tfQr2.postActionEvent();
         });
-        check("the first scan opens the day and records the pair",
-              mw.tablePanel.model().getRowCount() == 1);
+        int expectRows = saved ? 3 : 1;
+        check("the first scan lands in the day and records the pair",
+              mw.tablePanel.model().getRowCount() == expectRows);
         java.io.File journals = new java.io.File(home.toFile(), "RegistroQR/giornate");
         String[] names = journals.list();
         check("the day journal is on disk in the data folder", names != null && names.length == 1);
@@ -111,7 +122,7 @@ public final class StartupSmokeTest {
                 check("the settings dialog fits a small screen", settings.getHeight() <= 760);
                 JTabbedPane tabs = findTabs(settings);
                 boolean allFit = tabs != null;
-                String[] want = { "Postazione", "Codici", "Suoni", "Cartelle", "Aspetto" };
+                String[] want = { "Postazione", "Codici", "Suoni", "Cartelle", "Aspetto", "Storico" };
                 for (String w : want) allFit &= hasTab(tabs, w);
                 check("the settings hold postazione, codici, suoni, cartelle, aspetto", allFit);
                 boolean noClip = tabs != null;
@@ -191,6 +202,19 @@ public final class StartupSmokeTest {
         return null;
     }
 
+    private static JButton findButton(Container root, String text) {
+        for (Component c : root.getComponents()) {
+            if (c instanceof JButton && c.isShowing() && text.equals(((JButton) c).getText())) {
+                return (JButton) c;
+            }
+            if (c instanceof Container) {
+                JButton b = findButton((Container) c, text);
+                if (b != null) return b;
+            }
+        }
+        return null;
+    }
+
     private static JLabel findLabelContaining(Container root, String text) {
         for (Component c : root.getComponents()) {
             if (c instanceof JLabel && c.isShowing() && ((JLabel) c).getText() != null
@@ -236,10 +260,25 @@ public final class StartupSmokeTest {
         p.setProperty("scan.dupGuard", "true");
         p.setProperty("range.tailDigits", "3");
         p.setProperty("sound.on", "false");
+        // the last run did not end through the window: a crash, or the Task Manager
+        p.setProperty("app.running", "true");
         try (FileOutputStream out = new FileOutputStream(
                 new File(home.toFile(), ".registro_qr.properties"))) {
             p.store(out, "saved by StartupSmokeTest");
         }
+        // and it left a journal: two pairs, and a third cut mid-write
+        File dir = new File(home.toFile(), "RegistroQR/giornate");
+        dir.mkdirs();
+        String today = java.time.LocalDate.now().toString();
+        File journal = new File(dir, today + ".giornale");
+        java.time.Clock clock = java.time.Clock.systemDefaultZone();
+        app.core.Day d = app.core.Day.open(journal, new app.core.Day.Init("L2", today, 0, 0), clock);
+        d.add("209531.001_01-01_2612000297", "900612202601310007");
+        d.add("209531.001_01-01_2612000298", "900612202601310007");
+        d.add("209531.001_01-01_2612000299", "900612202601310008");
+        d.journal().close();
+        byte[] all = Files.readAllBytes(journal.toPath());
+        Files.write(journal.toPath(), java.util.Arrays.copyOf(all, all.length - 5));
     }
 
     /** A container asking for more height than it got is losing content. */

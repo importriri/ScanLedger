@@ -30,16 +30,108 @@ public final class Ledger {
         this.days = new Days(cfg.dataDir(), clock);
     }
 
-    /** Opens the open day, if any. A failure leaves no day and says why. */
+    /** What the start found, for the banners. */
+    private final List<String> recovered = new ArrayList<>();
+
+    /**
+     * Opens the open day, if any; records an export the journal missed (the
+     * PC went off between the rename and the event); retries failed copies of
+     * every day. A failure leaves no day and says why.
+     */
     public String open() {
         try {
             day = days.openCurrent(station());
             if (day != null && day.file() != null) lastSavedMillis = day.file().lastModified();
-            return null;
         } catch (IOException e) {
             diskOk = false;
             diskError = e.getMessage();
             return e.getMessage();
+        }
+        if (day != null) recovered.addAll(exporter().recoverMissing(day));
+        retryAllCopies();
+        return null;
+    }
+
+    /** Export files recorded at the start because the journal had missed them. */
+    public List<String> recovered() {
+        return recovered;
+    }
+
+    /** A fresh exporter: the folders may have changed in the settings. */
+    public Exporter exporter() {
+        return new Exporter(cfg.exportDir(), cfg.copyDir(), clock);
+    }
+
+    /** Incremental export (or the whole day again), then everyone hears about it. */
+    public Exporter.Result export(boolean reexport) {
+        Exporter x = exporter();
+        Exporter.Result r = reexport ? x.reexport(day) : x.export(day);
+        retryAllCopies();
+        fire();
+        return r;
+    }
+
+    /** Closes the day. On success there is no current day until the next scan. */
+    public Day.Result closeDay() {
+        if (day == null) return Day.Result.refused("Nessuna giornata aperta");
+        Day.Result r = day.close();
+        if (r.ok()) {
+            if (day.journal() != null) day.journal().close();
+            day = null;
+        }
+        return after(r);
+    }
+
+    /** A pending copy, for the banner and the history. */
+    public static final class PendingCopy {
+        public final String date;
+        public final int number;
+        public final String reason;
+
+        PendingCopy(String date, int number, String reason) {
+            this.date = date;
+            this.number = number;
+            this.reason = reason;
+        }
+    }
+
+    private final List<PendingCopy> pendingCopies = new ArrayList<>();
+
+    public List<PendingCopy> pendingCopies() {
+        return pendingCopies;
+    }
+
+    /** Retries every failed copy, of every day; closed days included. */
+    public int retryAllCopies() {
+        pendingCopies.clear();
+        Exporter x = exporter();
+        for (Days.Info i : days.list()) {
+            boolean current = day != null && day.file() != null
+                && day.file().getAbsoluteFile().equals(i.file.getAbsoluteFile());
+            Day d = current ? day : null;
+            try {
+                if (d == null) {
+                    Journal.Replay rr = Journal.read(i.file);
+                    if (rr.corrupted) continue;   // never "repair" an old day just to copy
+                    Day peek = Day.replayOnly(rr.events);
+                    if (Exporter.pendingCopies(peek) == 0) continue;
+                    if (x.copyDir() == null) { collect(peek); continue; }
+                    d = Day.open(i.file, new Day.Init(station(), i.date, 0, 0), clock);
+                }
+                x.retryCopies(d);
+                collect(d);
+            } catch (IOException e) {
+                // an unreadable old day is not a reason to stop the station
+            } finally {
+                if (d != null && d != day && d.journal() != null) d.journal().close();
+            }
+        }
+        return pendingCopies.size();
+    }
+
+    private void collect(Day d) {
+        for (ExportRecord r : d.exports()) {
+            if (r.copyPending()) pendingCopies.add(new PendingCopy(d.date(), r.number, r.copyReason()));
         }
     }
 

@@ -64,7 +64,8 @@ public class Main {
         ledger.open();
 
         ScanTabSupport.install();
-        SwingUtilities.invokeLater(() -> new MainWindow(ledger));
+        final boolean unclean = uncleanExit;
+        SwingUtilities.invokeLater(() -> new MainWindow(ledger, unclean));
     }
 
     public static boolean uncleanExit() {
