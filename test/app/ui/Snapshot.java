@@ -168,6 +168,17 @@ public final class Snapshot {
             }
         });
 
+        // 11: the manual, inside the settings
+        SwingUtilities.invokeAndWait(() -> win.openSettings("Manuale"));
+        Thread.sleep(300);
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                paint(win.settingsWindow().getContentPane(), new File(outDir, flavor + "-11-manuale.png"));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
         System.out.println("snapshots in " + outDir.getPath());
         System.exit(0);
     }

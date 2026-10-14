@@ -444,6 +444,7 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
             settingsWindow = new SettingsWindow(this, this::settingsChanged);
             history = new HistoryPanel(ledger);
             settingsWindow.addPage("Storico", history, false);
+            settingsWindow.addPage("Manuale", new ManualPane(), false);
         }
         if ("Storico".equals(tab) || tab == null) history.reload();
         if (tab != null) settingsWindow.showTab(tab);

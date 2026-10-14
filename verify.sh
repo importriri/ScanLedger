@@ -45,6 +45,7 @@ java -cp out app.core.DayLifecycleTest
 java -cp out app.ui.RowTableModelTest
 java -cp out app.ui.ScanFlowTest
 java -cp out app.ui.GlyphSafetyTest
+java -cp out app.ui.ManualRenderTest
 java -cp out app.ui.IconRenderTest
 java -cp out app.ui.SpinnerCommitTest
 java -cp out app.ui.ScanTabSupportTest
@@ -63,6 +64,9 @@ unzip -p dist/ScanLedger.jar META-INF/MANIFEST.MF \
     | tr -d '\r' \
     | grep -Fx 'Main-Class: app.Main'
 jar tf dist/ScanLedger.jar | grep -Fx 'app/Main.class'
+# the manuals travel inside the JAR: the settings window reads them from there
+jar tf dist/ScanLedger.jar | grep -Fx 'app/docs/MANUAL.it.md'
+jar tf dist/ScanLedger.jar | grep -Fx 'app/docs/MANUAL.en.md'
 
 # the packaged app starts and stays up, in a throwaway home
 xvfb-run -a bash -eu -c '

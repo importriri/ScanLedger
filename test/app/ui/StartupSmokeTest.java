@@ -122,9 +122,9 @@ public final class StartupSmokeTest {
                 check("the settings dialog fits a small screen", settings.getHeight() <= 760);
                 JTabbedPane tabs = findTabs(settings);
                 boolean allFit = tabs != null;
-                String[] want = { "Postazione", "Codici", "Suoni", "Cartelle", "Aspetto", "Storico" };
+                String[] want = { "Postazione", "Codici", "Suoni", "Cartelle", "Aspetto", "Storico", "Manuale" };
                 for (String w : want) allFit &= hasTab(tabs, w);
-                check("the settings hold postazione, codici, suoni, cartelle, aspetto", allFit);
+                check("the settings hold postazione, codici, suoni, cartelle, aspetto, storico, manuale", allFit);
                 boolean noClip = tabs != null;
                 for (int i = 0; tabs != null && i < tabs.getTabCount(); i++) {
                     final int idx = i;

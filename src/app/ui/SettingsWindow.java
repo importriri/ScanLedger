@@ -56,7 +56,7 @@ public class SettingsWindow extends JDialog {
         setLocationRelativeTo(owner);
     }
 
-    /** Adds a page after construction (Storico, Manuale arrive with later work). */
+    /** Adds a page after construction: Storico and Manuale need the ledger and the main window. */
     public void addPage(String title, JComponent content, boolean scroll) {
         tabs.addTab(title, scroll ? page(content) : content);
         int measured = 0;
