@@ -348,6 +348,19 @@ public final class Journal implements Closeable {
     public static Replay recover(File file, Clock clock) throws IOException {
         Replay r = read(file);
         if (r.corrupted) {
+            // one copy per damage, not one per start: the same bytes already
+            // copied are pointed at, not copied again
+            byte[] now = Files.readAllBytes(file.toPath());
+            File[] siblings = file.getParentFile().listFiles(
+                (dir, name) -> name.startsWith(file.getName() + ".corrotto-"));
+            if (siblings != null) {
+                Arrays.sort(siblings);
+                for (File old : siblings) {
+                    if (Arrays.equals(now, Files.readAllBytes(old.toPath()))) {
+                        return new Replay(r.events, r.goodLength, null, null, null, true, r.error, old);
+                    }
+                }
+            }
             String stamp = LocalDateTime.now(clock).format(
                 DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
             File copy = new File(file.getParentFile(), file.getName() + ".corrotto-" + stamp);

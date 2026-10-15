@@ -443,6 +443,11 @@ public final class JournalTest {
               && Arrays.equals(broken, Files.readAllBytes(copy.toPath())));
         check("a read-only day refuses new pairs",
               back.add(P + "399", LOT_A).kind == Day.Result.Kind.READ_ONLY);
+        clock.set("2026-10-13T08:00:00");
+        Day third = Day.open(d.file(), new Day.Init("L2", d.date(), 0, 0), clock);
+        String[] copies = d.file().getParentFile().list((f, n) -> n.contains(".corrotto-"));
+        check("opening it again does not make a second copy of the same bytes",
+              copies != null && copies.length == 1 && copy.equals(third.replay().corruptCopy));
     }
 
     private static void lock_secondAcquisition_fails() throws Exception {
