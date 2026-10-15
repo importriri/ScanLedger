@@ -47,7 +47,10 @@ public final class Ledger {
             diskError = e.getMessage();
             return e.getMessage();
         }
-        if (day != null) recovered.addAll(exporter().recoverMissing(day));
+        if (day != null) {
+            recovered.addAll(exporter().recoverMissing(day));
+            exporter().copyNeverTried(day);
+        }
         retryAllCopies();
         return null;
     }

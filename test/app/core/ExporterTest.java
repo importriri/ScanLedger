@@ -27,6 +27,8 @@ public final class ExporterTest {
         crashBetweenRenameAndEvent_isRecoveredAtStart();
         reexport_carriesEveryLiveRow_changesNoState();
         readOnlyDay_exportsReadableRows_withoutRecording();
+        recoveredExport_isCopied_toTheCopyFolder();
+        exportRecordedWithoutCopyEvent_isCopiedAtStart();
 
         System.out.println();
         System.out.println(passed + " passed, " + failed + " failed");
@@ -219,6 +221,46 @@ public final class ExporterTest {
         Exporter.Result r = new Exporter(new File(dir, "export"), null, c).export(ro);
         check("its readable rows can still be exported", r.ok && read(r.file).ok());
         check("as a re-export, so AutoFillSuite always pre-flights it", read(r.file).reexport());
+    }
+
+    private static void recoveredExport_isCopied_toTheCopyFolder() throws Exception {
+        File dir = tmp();
+        TestClock c = new TestClock("2026-10-13T07:00:00", 1000);
+        Day d = new Days(dir, c).createNew("L2");
+        d.add(P + "01", "LOT-A");
+        File stick = new File(dir, "chiavetta");
+        stick.mkdirs();
+        Exporter x = new Exporter(new File(dir, "export"), stick, c);
+        x.afterRename = () -> { throw new IllegalStateException("corrente staccata"); };
+        try {
+            x.export(d);
+        } catch (IllegalStateException expected) {
+            // the program died between the rename and the event
+        }
+        d.journal().close();
+        Day again = Day.open(d.file(), new Day.Init("L2", "2026-10-13", 0, 0), c);
+        Exporter y = new Exporter(new File(dir, "export"), stick, c);
+        y.recoverMissing(again);
+        String name = CsvWriter.fileName("L2", "2026-10-13", 1);
+        check("a recovered export reaches the copy folder too", new File(stick, name).exists());
+        check("and its copy is recorded", "OK".equals(again.export(1).copyOutcome()));
+    }
+
+    private static void exportRecordedWithoutCopyEvent_isCopiedAtStart() throws Exception {
+        File dir = tmp();
+        TestClock c = new TestClock("2026-10-13T07:00:00", 1000);
+        Day d = new Days(dir, c).createNew("L2");
+        d.add(P + "01", "LOT-A");
+        // the export event is written, then the PC goes off before the copy
+        Exporter.Result r = new Exporter(new File(dir, "export"), null, c).export(d);
+        d.journal().close();
+        File stick = new File(dir, "chiavetta");
+        stick.mkdirs();
+        Day again = Day.open(d.file(), new Day.Init("L2", "2026-10-13", 0, 0), c);
+        Exporter y = new Exporter(new File(dir, "export"), stick, c);
+        y.copyNeverTried(again);
+        check("an export of the open day that was never copied is copied at start",
+              new File(stick, r.file.getName()).exists() && "OK".equals(again.export(1).copyOutcome()));
     }
 
     static void check(String name, boolean cond) {

@@ -284,6 +284,27 @@ public final class Exporter {
         return pendingCopies(day);
     }
 
+    /**
+     * Copies the exports of a day that never had a copy attempt: one recorded
+     * at the start after a power cut, or one whose event was written just
+     * before the PC went off and the copy never ran. Without this, a file the
+     * copy folder never saw would not even show as pending, and AutoFillSuite
+     * would stop at the next file of the day (out of order). Only for the open
+     * day: an old export made with no copy folder configured stays as it was.
+     */
+    public int copyNeverTried(Day day) {
+        if (copyDir == null || day == null || day.isCorrupted()) return 0;
+        int copied = 0;
+        for (ExportRecord x : day.exports()) {
+            if (!x.copyOutcome().isEmpty()) continue;
+            File f = new File(exportDir, x.fileName);
+            if (!f.exists()) continue;
+            copyOne(day, x.number, f);
+            copied++;
+        }
+        return copied;
+    }
+
     public static int pendingCopies(Day day) {
         int n = 0;
         if (day == null) return 0;
@@ -403,7 +424,10 @@ public final class Exporter {
             if (!sameRows(r.rows, day.linesFor(ns, r.reexport()))) continue;
             Day.Result rec = day.recordExport(r.exportNumber(), r.created(), r.computedSha, f.getName(),
                                               r.reexport(), ns);
-            if (rec.ok()) found.add(f.getName());
+            if (rec.ok()) {
+                found.add(f.getName());
+                copyOne(day, r.exportNumber(), f);
+            }
         }
         return found;
     }
