@@ -61,6 +61,7 @@ public final class ScanFlowTest {
         on(ScanFlowTest::exportedRow_editsOnlyTheLot);
         on(ScanFlowTest::goToRow_selectsTheExistingRow);
         on(ScanFlowTest::tornEdit_isNotReportedAsAPairToScanAgain);
+        on(ScanFlowTest::exportPreview_showsEveryLineWhole);
 
         System.out.println();
         System.out.println(passed + " passed, " + failed + " failed");
@@ -83,6 +84,29 @@ public final class ScanFlowTest {
               b[0].contains("modifica") && b[0].contains("#1") && !b[1].toLowerCase(java.util.Locale.ROOT).contains("sparala"));
         check("a torn pair still says to scan it again",
               MainWindow.discardBanner(tornPair())[1].toLowerCase(java.util.Locale.ROOT).contains("sparala"));
+    }
+
+    // the preview is the file as it will be written: its last line (#fine,
+    // with the fingerprint) must be on screen, not wrapped out of the box
+    private static void exportPreview_showsEveryLineWhole() throws Exception {
+        scanEnter(P + "95", "900612202601310095");
+        ExportDialog d = new ExportDialog(win, ledger, false);
+        JTextArea pv = null;
+        for (Component c : allComponents(d.getContentPane())) if (c instanceof JTextArea) pv = (JTextArea) c;
+        int lines = pv == null ? 0 : pv.getText().split("\n").length;
+        check("the export preview does not wrap lines", pv != null && !pv.getLineWrap());
+        check("the export preview has a row for every line, #fine included",
+              pv != null && pv.getRows() >= lines && pv.getText().contains("#fine"));
+        d.dispose();
+    }
+
+    private static java.util.List<Component> allComponents(Container root) {
+        java.util.List<Component> out = new java.util.ArrayList<>();
+        for (Component c : root.getComponents()) {
+            out.add(c);
+            if (c instanceof Container) out.addAll(allComponents((Container) c));
+        }
+        return out;
     }
 
     private static Journal.Replay tornPair() throws Exception {

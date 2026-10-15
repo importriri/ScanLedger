@@ -90,11 +90,19 @@ final class ExportDialog extends JDialog {
             pv.setFont(AppTheme.F_MONO.deriveFont(11f));
             pv.setBackground(AppTheme.MANTLE);
             pv.setForeground(AppTheme.SUBTEXT);
-            pv.setLineWrap(true);
-            pv.setRows(8);
+            // the file as it will be written: one screen row per file line, no
+            // wrapping (it pushed #fine and its fingerprint out of the box);
+            // a long line scrolls sideways instead
+            pv.setLineWrap(false);
+            pv.setRows(Math.max(1, plan.preview.split("\n").length));
             pv.setColumns(70);
             pv.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
-            body.add(pv, BorderLayout.CENTER);
+            JScrollPane sp = new JScrollPane(pv, ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER,
+                                             ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+            sp.setBorder(BorderFactory.createEmptyBorder());
+            sp.getViewport().setBackground(AppTheme.MANTLE);
+            AppTheme.styleScroll(sp);
+            body.add(sp, BorderLayout.CENTER);
         }
 
         setContentPane(root);
