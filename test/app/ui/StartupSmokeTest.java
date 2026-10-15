@@ -120,6 +120,12 @@ public final class StartupSmokeTest {
             check("the gear opens the settings window", settings != null);
             if (settings != null) {
                 check("the settings dialog fits a small screen", settings.getHeight() <= 760);
+                Thread.sleep(300);
+                Component owner = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+                // a scan fired while the settings are open must not land in a field:
+                // its ENTER would save it as the station name or a QR pattern
+                check("the settings open with no text field holding the caret",
+                      !(owner instanceof javax.swing.text.JTextComponent));
                 JTabbedPane tabs = findTabs(settings);
                 boolean allFit = tabs != null;
                 String[] want = { "Postazione", "Codici", "Suoni", "Cartelle", "Aspetto", "Storico", "Manuale" };
