@@ -255,8 +255,7 @@ public final class Exporter {
         if (reason == null && day.file() != null) {
             // the day journal travels too: a safety copy, read by nobody unless needed
             try {
-                Files.copy(day.file().toPath(), new File(copyDir, day.file().getName()).toPath(),
-                           StandardCopyOption.REPLACE_EXISTING);
+                writeForced(new File(copyDir, day.file().getName()), Files.readAllBytes(day.file().toPath()));
             } catch (IOException e) {
                 reason = "giornale non copiato: " + e.getMessage();
             }
@@ -276,16 +275,30 @@ public final class Exporter {
                 if (Arrays.equals(want, Files.readAllBytes(dest.toPath()))) return null;
                 return "nella cartella di copia c'è già un " + dest.getName() + " diverso";
             }
-            File tmp = new File(dir, dest.getName() + ".tmp");
-            Files.write(tmp.toPath(), want);
-            try {
-                Files.move(tmp.toPath(), dest.toPath(), StandardCopyOption.ATOMIC_MOVE);
-            } catch (IOException atomicUnsupported) {
-                Files.move(tmp.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            }
+            writeForced(dest, want);
             return null;
         } catch (IOException e) {
             return e.getMessage() == null ? e.toString() : e.getMessage();
+        }
+    }
+
+    /**
+     * tmp, forced, then renamed over the target. A USB stick caches writes:
+     * without the force, "COPIA OK" could be recorded for a file a power cut
+     * then leaves empty, and nothing would ever retry it.
+     */
+    static void writeForced(File dest, byte[] bytes) throws IOException {
+        File tmp = new File(dest.getParentFile(), dest.getName() + ".tmp");
+        try (FileChannel ch = FileChannel.open(tmp.toPath(), StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
+            ByteBuffer buf = ByteBuffer.wrap(bytes);
+            while (buf.hasRemaining()) ch.write(buf);
+            ch.force(true);
+        }
+        try {
+            Files.move(tmp.toPath(), dest.toPath(), StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException atomicUnsupported) {
+            Files.move(tmp.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
