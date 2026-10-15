@@ -100,6 +100,10 @@ public final class RangePanel extends JPanel {
         tfFirst.getDocument().addDocumentListener(live);
         tfLot.getDocument().addDocumentListener(live);
         spCount.addChangeListener(e -> update());
+        // the lot stays on screen for the next range: a lot scanned again must
+        // replace it, not be glued onto it (32 rows went out with the lot twice)
+        selectAllOnFocus(tfLot);
+        selectAllOnFocus(tfFirst);
         // the scanner sends ENTER after the first label: on to the lot
         tfFirst.addActionListener(e -> {
             if (!tfFirst.getText().trim().isEmpty()) tfLot.requestFocusInWindow();
@@ -142,8 +146,12 @@ public final class RangePanel extends JPanel {
     static void selectAllOnFocus(final JTextField f) {
         f.addFocusListener(new java.awt.event.FocusAdapter() {
             @Override public void focusGained(java.awt.event.FocusEvent e) {
-                // later: a formatted field puts its caret back after gaining the focus
-                SwingUtilities.invokeLater(f::selectAll);
+                // NOW for a scan field: the scanner's keystrokes are already queued
+                // and are handed over right after this event. A formatted field
+                // (the quantity, typed by hand) resets its text after its
+                // listeners, so it selects once more, later.
+                f.selectAll();
+                if (f instanceof JFormattedTextField) SwingUtilities.invokeLater(f::selectAll);
             }
         });
     }
