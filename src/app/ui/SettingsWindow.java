@@ -20,6 +20,7 @@ public class SettingsWindow extends JDialog {
 
     /** Tallest the tab area may ask for: the dialog must fit a 768px screen. */
     private static final int TAB_AREA_MAX_H = 600;
+    private static final int TAB_AREA_W = 580;
 
     private final Settings cfg = Settings.getInstance();
     private final Runnable onChange;
@@ -40,8 +41,6 @@ public class SettingsWindow extends JDialog {
         tabs.addTab("Suoni",      page(buildSounds()));
         tabs.addTab("Cartelle",   page(buildFolders()));
         tabs.addTab("Aspetto",    page(buildLook()));
-        int measured = tabs.getPreferredSize().height;
-        tabs.setPreferredSize(new Dimension(580, Math.min(measured, TAB_AREA_MAX_H)));
         root.add(tabs, BorderLayout.CENTER);
 
         JButton close = AppTheme.ghost("Chiudi");
@@ -52,19 +51,36 @@ public class SettingsWindow extends JDialog {
         root.add(south, BorderLayout.SOUTH);
 
         setContentPane(root);
-        pack();
+        fitTabs();
         setLocationRelativeTo(owner);
     }
 
     /** Adds a page after construction: Storico and Manuale need the ledger and the main window. */
     public void addPage(String title, JComponent content, boolean scroll) {
         tabs.addTab(title, scroll ? page(content) : content);
-        int measured = 0;
+        fitTabs();
+    }
+
+    /**
+     * Tab area = tallest page + the tab strip, capped. The strip is MEASURED
+     * after a layout, not assumed: with wider fonts seven tabs wrap onto two
+     * rows at this width, and a guessed strip height cut the Storico page.
+     */
+    private void fitTabs() {
+        int tallest = 0;
         for (int i = 0; i < tabs.getTabCount(); i++) {
-            measured = Math.max(measured, tabs.getComponentAt(i).getPreferredSize().height + 40);
+            tallest = Math.max(tallest, tabs.getComponentAt(i).getPreferredSize().height);
         }
-        tabs.setPreferredSize(new Dimension(580, Math.min(measured, TAB_AREA_MAX_H)));
+        tabs.setPreferredSize(new Dimension(TAB_AREA_W, Math.min(tallest + 40, TAB_AREA_MAX_H)));
         pack();
+        Component shown = tabs.getSelectedComponent();
+        if (shown == null || shown.getHeight() <= 0) return;
+        int strip = tabs.getHeight() - shown.getHeight();
+        int want = Math.min(tallest + strip, TAB_AREA_MAX_H);
+        if (want != tabs.getHeight()) {
+            tabs.setPreferredSize(new Dimension(TAB_AREA_W, want));
+            pack();
+        }
     }
 
     public void showTab(String title) {
