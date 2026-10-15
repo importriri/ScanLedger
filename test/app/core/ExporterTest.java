@@ -30,6 +30,7 @@ public final class ExporterTest {
         recoveredExport_isCopied_toTheCopyFolder();
         exportRecordedWithoutCopyEvent_isCopiedAtStart();
         unrecordedExport_leavesNoFile_thatBlocksTheNextOne();
+        reexport_withRowsNeverExported_isRefused();
 
         System.out.println();
         System.out.println(passed + " passed, " + failed + " failed");
@@ -283,6 +284,22 @@ public final class ExporterTest {
         Exporter.Result next = new Exporter(new File(dir, "export"), null, c).export(again);
         check("the next export goes through as number 1 with both rows",
               next.ok && read(next.file).exportNumber() == 1 && read(next.file).rows.size() == 2);
+    }
+
+    private static void reexport_withRowsNeverExported_isRefused() throws Exception {
+        File dir = tmp();
+        TestClock c = new TestClock("2026-10-13T07:00:00", 1000);
+        Day d = new Days(dir, c).createNew("L2");
+        d.add(P + "01", "LOT-A");
+        Exporter x = new Exporter(new File(dir, "export"), null, c);
+        x.export(d);
+        d.add(P + "02", "LOT-A");
+        Exporter.Result r = x.reexport(d);
+        // a re-export changes no state: row 2 would reach the portal and still
+        // be deletable and relabelable here
+        check("a re-export with rows never exported is refused", !r.ok && r.file == null);
+        check("and says to export them first", r.message.contains("Esporta prima"));
+        check("row 2 is still pending", d.pendingExport().equals(Arrays.asList(2)));
     }
 
     static void check(String name, boolean cond) {

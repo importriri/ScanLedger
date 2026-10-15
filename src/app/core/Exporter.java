@@ -155,6 +155,16 @@ public final class Exporter {
         // readable rows over, as a re-export (AutoFillSuite always pre-flights those)
         boolean readOnly = day.isCorrupted();
         if (readOnly) reexport = true;
+        if (reexport && !readOnly) {
+            // a re-export changes no row: a row that never went out would reach
+            // the portal and still be deletable and relabelable here
+            int never = 0;
+            for (Row r : day.rows()) if (!r.deleted() && !r.everExported()) never++;
+            if (never > 0) {
+                return Result.fail("Esporta prima le " + never + " righe nuove: una riesportazione "
+                                   + "porta solo righe già esportate");
+            }
+        }
         List<Integer> ns = reexport ? day.liveRows() : day.pendingExport();
         if (ns.isEmpty()) return Result.fail("Niente da esportare: nessuna riga nuova e nessuna correzione");
         int number = nextNumber(day);
