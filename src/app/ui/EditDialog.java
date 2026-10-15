@@ -172,8 +172,8 @@ final class EditDialog extends JDialog {
             else if (advice == ScanGuard.MISMATCH) problem = "forma non riconosciuta";
             else {
                 Day d = ledger.day();
-                Row dup = d == null ? null : d.findLive(label);
-                if (dup != null && dup.n != row.n) problem = "doppione: è già la riga #" + dup.n;
+                int dup = d == null ? 0 : d.duplicateOf(label);
+                if (dup != 0 && dup != row.n) problem = "doppione: è già la riga #" + dup;
             }
         }
         String text;

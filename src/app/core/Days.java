@@ -7,7 +7,9 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -112,13 +114,15 @@ public final class Days {
     /** Numbering continues from the earlier days of the same date. */
     private Day.Init init(String station, String date, int k) throws IOException {
         int nBase = 0, exportBase = 0;
+        Map<String, Integer> earlier = new HashMap<>();
         for (Info i : list()) {
             if (!i.date.equals(date) || i.k >= k) continue;
             Day prev = Day.replayOnly(Journal.read(i.file).events);
             nBase = Math.max(nBase, prev.maxN());
             exportBase = Math.max(exportBase, prev.lastExportNumber());
+            for (Row r : prev.rows()) if (!r.deleted()) earlier.put(r.label(), r.n);
         }
-        return new Day.Init(station, date, nBase, exportBase);
+        return new Day.Init(station, date, nBase, exportBase, earlier);
     }
 
     /**

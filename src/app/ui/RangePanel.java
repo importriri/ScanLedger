@@ -4,7 +4,6 @@ import app.config.Settings;
 import app.core.Day;
 import app.core.Ledger;
 import app.core.Ranges;
-import app.core.Row;
 import app.core.ScanGuard;
 
 import javax.swing.*;
@@ -196,8 +195,7 @@ public final class RangePanel extends JPanel {
         Day d = ledger.day();
         if (d == null || d.isClosed()) return out;
         for (String l : labels) {
-            Row r = d.findLive(l);
-            if (r != null) out.add(l);
+            if (d.duplicateOf(l) != 0) out.add(l);
         }
         return out;
     }

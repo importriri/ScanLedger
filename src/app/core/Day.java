@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -85,6 +86,13 @@ public final class Day {
     private int exportBase;
 
     private final Map<Integer, Row> rows = new LinkedHashMap<>();
+    /**
+     * Labels still live in the earlier days of the same date (_1 when this is
+     * _2...). The CSV carries the same date for all of them, and AutoFillSuite
+     * registers them as one day: a second row for one of these labels is the
+     * same silent correction as a duplicate inside this file.
+     */
+    private final Map<String, Integer> earlier = new HashMap<>();
     /** additions in order: {n0, count}; the last one is what "undo" removes */
     private final List<int[]> additions = new ArrayList<>();
     private final List<ExportRecord> exports = new ArrayList<>();
@@ -113,6 +121,7 @@ public final class Day {
         Journal.Replay r = Journal.recover(file, clock);
         if (r.corrupted) {
             Day d = new Day(file, null, r, true);
+            d.earlier.putAll(init.earlierLabels);
             for (Event e : r.events) d.apply(e);
             return d;
         }
@@ -120,6 +129,7 @@ public final class Day {
         // late backup copy or a re-export of the whole day is still recorded
         Journal j = Journal.openForAppend(file, r, clock);
         Day d = new Day(file, j, r, false);
+        d.earlier.putAll(init.earlierLabels);
         for (Event e : r.events) d.apply(e);
         if (r.events.isEmpty() && j != null) {
             Event e = j.append(Event.Type.APRI, Journal.fields(
@@ -142,12 +152,20 @@ public final class Day {
         public final String date;
         public final int nBase;
         public final int exportBase;
+        /** live labels of the earlier days of the same date, with their n */
+        public final Map<String, Integer> earlierLabels;
 
         public Init(String station, String date, int nBase, int exportBase) {
+            this(station, date, nBase, exportBase, Collections.<String, Integer>emptyMap());
+        }
+
+        public Init(String station, String date, int nBase, int exportBase,
+                    Map<String, Integer> earlierLabels) {
             this.station = station;
             this.date = date;
             this.nBase = nBase;
             this.exportBase = exportBase;
+            this.earlierLabels = earlierLabels;
         }
     }
 
@@ -223,6 +241,17 @@ public final class Day {
         return 1;
     }
 
+    /**
+     * n of the live row holding this label in this day or in an earlier day
+     * of the same date; 0 when the label is free.
+     */
+    public int duplicateOf(String label) {
+        Row r = findLive(label);
+        if (r != null) return r.n;
+        Integer n = earlier.get(label);
+        return n == null ? 0 : n;
+    }
+
     /** The live row holding this label, or null. */
     public Row findLive(String label) {
         for (Row r : rows.values()) {
@@ -292,8 +321,8 @@ public final class Day {
         lot = clean(lot);
         String bad = badPair(label, lot);
         if (bad != null) return Result.refused(bad);
-        Row dup = findLive(label);
-        if (dup != null) return Result.duplicate(label, dup.n);
+        int dup = duplicateOf(label);
+        if (dup != 0) return Result.duplicate(label, dup);
         int n = maxN() + 1;
         return write(Event.Type.AGGIUNGI,
                      String.valueOf(n), label, lot, Row.Mode.SCAN.name());
@@ -317,6 +346,7 @@ public final class Day {
         Set<String> seen = new HashSet<>();
         Set<String> live = new HashSet<>();
         for (Row r : rows.values()) if (!r.deleted) live.add(r.label);
+        live.addAll(earlier.keySet());
         for (String c : clean) {
             if (live.contains(c) || !seen.add(c)) dups.add(c);
         }
@@ -344,8 +374,8 @@ public final class Day {
         }
         if (label.equals(r.label) && lot.equals(r.lot)) return Result.unchanged("Nessuna modifica");
         if (!label.equals(r.label)) {
-            Row dup = findLive(label);
-            if (dup != null && dup.n != n) return Result.duplicate(label, dup.n);
+            int dup = duplicateOf(label);
+            if (dup != 0 && dup != n) return Result.duplicate(label, dup);
         }
         return write(Event.Type.MODIFICA, String.valueOf(n), label, lot,
                      reason == null ? "" : clean(reason));
@@ -367,8 +397,8 @@ public final class Day {
         Row r = rows.get(n);
         if (r == null) return Result.refused("Riga " + n + " inesistente");
         if (!r.deleted) return Result.unchanged("La riga non è eliminata");
-        Row dup = findLive(r.label);
-        if (dup != null) return Result.duplicate(r.label, dup.n);
+        int dup = duplicateOf(r.label);
+        if (dup != 0) return Result.duplicate(r.label, dup);
         return write(Event.Type.RIPRISTINA, String.valueOf(n));
     }
 

@@ -56,6 +56,11 @@ public final class DayLifecycleTest {
               && l.day().file().getName().equals("2026-10-13_2.giornale"));
         check("_2 continues the row numbers of the first", l.day().row(2) != null && l.day().row(1) == null);
         check("_2 continues the export numbers", l.day().nextExportNumber() == 2);
+        Day.Result again03 = l.add(P + "03", "LOT-X");
+        check("a label already in _1 of the same date is a duplicate in _2",
+              again03.kind == Day.Result.Kind.DUPLICATE && again03.existingN == 1);
+        check("and so is a range that covers it",
+              l.addRange(Arrays.asList(P + "07", P + "03"), "LOT-X").kind == Day.Result.Kind.DUPLICATE);
 
         // a closed day: rows frozen, copies and re-exports still recorded
         Day closed = Day.open(first, new Day.Init("L2", "2026-10-12", 0, 0), c);

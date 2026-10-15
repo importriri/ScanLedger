@@ -202,8 +202,8 @@ public final class ScanPanel extends JPanel {
                 return;
             }
             Day d = ledger.day();
-            Row dup = d == null || d.isClosed() ? null : d.findLive(q1);
-            if (dup != null) {
+            int dup = d == null || d.isClosed() ? 0 : d.duplicateOf(q1);
+            if (dup != 0) {
                 duplicate(q1, dup);
                 return;
             }
@@ -223,7 +223,7 @@ public final class ScanPanel extends JPanel {
                     break;
                 }
                 case DUPLICATE:
-                    duplicate(q1, ledger.day().row(r.existingN));
+                    duplicate(q1, r.existingN);
                     break;
                 case IO_ERROR:
                     refuse(Pending.OTHER, AppTheme.RED, "DISCO NON SCRIVE", r.message);
@@ -236,11 +236,18 @@ public final class ScanPanel extends JPanel {
         }
     }
 
-    private void duplicate(String label, Row dup) {
-        pendingRow = dup == null ? 0 : dup.n;
-        String when = dup == null ? "" : " (" + RowTableModel.time(dup.created) + ")";
+    private void duplicate(String label, int n) {
+        Day d = ledger.day();
+        Row dup = d == null ? null : d.row(n);
+        pendingRow = n;
+        if (dup == null) {
+            // a row of an earlier day of the same date: not in this table
+            refuse(Pending.OTHER, AppTheme.RED, "GIÀ REGISTRATA OGGI",
+                   label + " è la riga #" + n + " della giornata chiusa prima");
+            return;
+        }
         refuse(Pending.DUPLICATE, AppTheme.RED, "GIÀ REGISTRATA OGGI",
-               label + " è la riga #" + pendingRow + when);
+               label + " è la riga #" + n + " (" + RowTableModel.time(dup.created) + ")");
     }
 
     private String blockedTitle() {
