@@ -274,20 +274,24 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
         Day d = ledger.day();
         if (d == null || d.isReadOnly()) return;
         int nw = d.pendingNew(), corr = d.pendingCorrections();
+        // both questions answer No to the keyboard: the next scan's ENTER must
+        // not close the day (or open the export) behind the operator's back
         if (nw > 0 || corr > 0) {
-            Object[] options = { "Esporta adesso", "Annulla" };
-            int c = JOptionPane.showOptionDialog(this,
-                "Prima di chiudere bisogna esportare: " + nw + " righe nuove, " + corr + " correzioni.",
-                "Chiudi giornata", JOptionPane.DEFAULT_OPTION, JOptionPane.WARNING_MESSAGE,
-                null, options, options[0]);
-            if (c == 0) openExport(false);
+            if (SafeConfirm.ask(this,
+                    "Prima di chiudere bisogna esportare: " + nw + " righe nuove, " + corr + " correzioni.\n"
+                    + "Esportare adesso?", "Chiudi giornata")) {
+                openExport(false);
+            }
+            focusScan();
             return;
         }
-        int c = JOptionPane.showConfirmDialog(this,
-            "Chiudere la giornata del " + ExportDialog.dm(d.date()) + " (" + d.liveCount() + " coppie)?\n"
-            + "Diventa di sola lettura; la prossima coppia apre una giornata nuova.",
-            "Chiudi giornata", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
-        if (c != JOptionPane.OK_OPTION) return;
+        if (!SafeConfirm.ask(this,
+                "Chiudere la giornata del " + ExportDialog.dm(d.date()) + " (" + d.liveCount() + " coppie)?\n"
+                + "Diventa di sola lettura; la prossima coppia apre una giornata nuova.",
+                "Chiudi giornata")) {
+            focusScan();
+            return;
+        }
         Day.Result r = ledger.closeDay();
         if (r.ok()) {
             Sounds.ok();
