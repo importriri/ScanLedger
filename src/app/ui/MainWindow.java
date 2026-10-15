@@ -298,7 +298,7 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
             clearDayBanners();
         } else {
             Sounds.error();
-            JOptionPane.showMessageDialog(this, r.message, "Chiudi giornata", JOptionPane.WARNING_MESSAGE);
+            tablePanel.problem(r.message);
         }
         focusScan();
     }
@@ -417,7 +417,7 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
         if (res.ok()) Sounds.ok();
         else {
             Sounds.error();
-            JOptionPane.showMessageDialog(this, res.message, "Elimina", JOptionPane.WARNING_MESSAGE);
+            tablePanel.problem(res.message);
         }
         focusScan();
     }
@@ -427,7 +427,7 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
         if (res.ok()) Sounds.ok();
         else {
             Sounds.error();
-            JOptionPane.showMessageDialog(this, res.message, "Ripristina", JOptionPane.WARNING_MESSAGE);
+            tablePanel.problem(res.message);
         }
         focusScan();
     }

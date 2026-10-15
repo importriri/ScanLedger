@@ -44,6 +44,7 @@ java -cp out app.core.RegenerateTest
 java -cp out app.core.DayLifecycleTest
 java -cp out app.ui.RowTableModelTest
 java -cp out app.ui.ScanFlowTest
+java -cp out app.ui.ScannerKeysTest
 java -cp out app.ui.GlyphSafetyTest
 java -cp out app.ui.ManualRenderTest
 java -cp out app.ui.IconRenderTest

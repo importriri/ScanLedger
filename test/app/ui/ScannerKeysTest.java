@@ -133,6 +133,9 @@ public final class ScannerKeysTest {
     }
 
     private static void refusedDelete_doesNotSwallowTheNextScan() throws Exception {
+        // with no window manager (Xvfb) the frame does not get the focus back
+        // by itself after a dialog: the operator's click on QR 1 does it
+        click(win.scanPanel.tfQr1);
         int before = liveCount();
         // row 1 is exported: deleting it is refused
         SwingUtilities.invokeAndWait(() -> win.tablePanel.showRow(1));
@@ -163,6 +166,18 @@ public final class ScannerKeysTest {
         robot.keyPress(KeyEvent.VK_ENTER);
         robot.keyRelease(KeyEvent.VK_ENTER);
         settle(150);
+    }
+
+    private static void click(JComponent c) throws Exception {
+        final Point[] at = new Point[1];
+        SwingUtilities.invokeAndWait(() -> {
+            Point p = c.getLocationOnScreen();
+            at[0] = new Point(p.x + c.getWidth() / 2, p.y + c.getHeight() / 2);
+        });
+        robot.mouseMove(at[0].x, at[0].y);
+        robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
+        robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
+        settle(300);
     }
 
     private static void clickTableRow(int viewRow) throws Exception {

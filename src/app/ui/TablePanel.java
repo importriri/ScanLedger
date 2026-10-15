@@ -172,8 +172,20 @@ public final class TablePanel extends JPanel {
         }
     }
 
+    /**
+     * A refusal, in the line under the table: never a modal window, because a
+     * window would take the next scan — its ENTER closes it, QR 1 is lost and
+     * QR 2 lands in QR 1. Stays until the selection changes.
+     */
+    void problem(String text) {
+        hint.setText(text);
+        hint.setToolTipText(text);
+        hint.setForeground(AppTheme.RED);
+    }
+
     private void refreshButtons() {
         Row r = selected();
+        hint.setForeground(AppTheme.OVERLAY);
         boolean writable = ledger.day() != null && !ledger.day().isReadOnly();
         btnEdit.setEnabled(writable && r != null && !r.deleted());
         btnDelete.setEnabled(writable && r != null && !r.deleted() && !r.everExported());
