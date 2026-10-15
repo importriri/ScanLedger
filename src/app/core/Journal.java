@@ -163,6 +163,11 @@ public final class Journal implements Closeable {
 
     // ── encoding ─────────────────────────────────────────────────────────
 
+    /** The line a test writes by hand, exactly as the journal would. */
+    public static String encodeForTest(Event e) {
+        return encode(e);
+    }
+
     static String encode(Event e) {
         StringBuilder sb = new StringBuilder();
         sb.append(e.seq).append('\t').append(e.ts).append('\t').append(e.type.name());
@@ -257,6 +262,27 @@ public final class Journal implements Closeable {
             this.corrupted = corrupted;
             this.error = error;
             this.corruptCopy = corruptCopy;
+        }
+
+        /** The event type of the torn line ("AGGIUNGI", "MODIFICA"...), or "" when unreadable. */
+        public String discardedType() {
+            if (discardedTail == null) return "";
+            String[] parts = discardedTail.split("\t", -1);
+            if (parts.length < 3) return "";
+            for (Event.Type t : Event.Type.values()) if (t.name().equals(parts[2])) return parts[2];
+            return "";
+        }
+
+        /** The row the torn line was about, for edits, deletions and restores; 0 otherwise. */
+        public int discardedRow() {
+            String t = discardedType();
+            if (!"MODIFICA".equals(t) && !"ELIMINA".equals(t) && !"RIPRISTINA".equals(t)) return 0;
+            String[] parts = discardedTail.split("\t", -1);
+            try {
+                return parts.length > 3 ? Integer.parseInt(parts[3]) : 0;
+            } catch (NumberFormatException e) {
+                return 0;
+            }
         }
 
         public boolean hasDiscardedTail() {

@@ -60,10 +60,38 @@ public final class ScanFlowTest {
         on(ScanFlowTest::editDialog_changesLabelAndLot);
         on(ScanFlowTest::exportedRow_editsOnlyTheLot);
         on(ScanFlowTest::goToRow_selectsTheExistingRow);
+        on(ScanFlowTest::tornEdit_isNotReportedAsAPairToScanAgain);
 
         System.out.println();
         System.out.println(passed + " passed, " + failed + " failed");
         System.exit(failed > 0 ? 1 : 0);
+    }
+
+    // the PC went off while writing an edit, not a pair: "scan it again" would
+    // only give a duplicate. the banner names what was lost and the row
+    private static void tornEdit_isNotReportedAsAPairToScanAgain() throws Exception {
+        java.io.File f = Files.createTempFile("rqr-torn", ".giornale").toFile();
+        String head = Journal.encodeForTest(new Event(1, "2026-10-13T07:00:00.000", Event.Type.APRI,
+                java.util.Arrays.asList("L2", "2026-10-13", "0", "0")))
+            + Journal.encodeForTest(new Event(2, "2026-10-13T07:00:01.000", Event.Type.AGGIUNGI,
+                java.util.Arrays.asList("1", P + "90", "LOT-A", "SCAN")));
+        String torn = "3\t2026-10-13T07:00:02.000\tMODIFICA\t1\t" + P + "90\tLOT-";
+        Files.write(f.toPath(), (head + torn).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        Journal.Replay r = Journal.recover(f, Clock.systemDefaultZone());
+        String[] b = MainWindow.discardBanner(r);
+        check("a torn edit is named as an edit of row 1",
+              b[0].contains("modifica") && b[0].contains("#1") && !b[1].toLowerCase(java.util.Locale.ROOT).contains("sparala"));
+        check("a torn pair still says to scan it again",
+              MainWindow.discardBanner(tornPair())[1].toLowerCase(java.util.Locale.ROOT).contains("sparala"));
+    }
+
+    private static Journal.Replay tornPair() throws Exception {
+        java.io.File f = Files.createTempFile("rqr-torn", ".giornale").toFile();
+        String head = Journal.encodeForTest(new Event(1, "2026-10-13T07:00:00.000", Event.Type.APRI,
+                java.util.Arrays.asList("L2", "2026-10-13", "0", "0")));
+        String torn = "2\t2026-10-13T07:00:01.000\tAGGIUNGI\t1\t" + P + "91\t9006";
+        Files.write(f.toPath(), (head + torn).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return Journal.recover(f, Clock.systemDefaultZone());
     }
 
     interface Step { void run() throws Exception; }

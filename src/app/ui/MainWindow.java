@@ -309,6 +309,30 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
         focusScan();
     }
 
+    /** {title, detail} of the banner for a torn last line, by what the line was. */
+    static String[] discardBanner(Journal.Replay r) {
+        String type = r.discardedType();
+        if ("MODIFICA".equals(type) || "ELIMINA".equals(type) || "RIPRISTINA".equals(type)) {
+            String what = "MODIFICA".equals(type) ? "modifica" : "ELIMINA".equals(type) ? "eliminazione" : "ripristino";
+            int n = r.discardedRow();
+            return new String[] { "Ultima " + what + " non salvata" + (n > 0 ? ": riga #" + n : ""),
+                "Il PC si è spento mentre la scriveva: la riga è com'era prima. Controllala e rifalla." };
+        }
+        if ("INTERVALLO".equals(type)) {
+            return new String[] { "Ultimo intervallo scartato" + (r.discardedLot == null ? "" : ": lotto " + r.discardedLot),
+                "Il PC si è spento mentre lo scriveva: non è registrato. Aggiungilo di nuovo." };
+        }
+        if ("AGGIUNGI".equals(type) || type.isEmpty()) {
+            String what = r.discardedLabel == null ? "una riga incompleta"
+                        : r.discardedLabel + (r.discardedLot == null ? "" : "  -  " + r.discardedLot);
+            return new String[] { "Ultima coppia scartata: " + what,
+                "Il PC si è spento mentre la scriveva: non era confermata. Sparala di nuovo." };
+        }
+        // an export, a copy, a closing: the start-up checks redo what they need
+        return new String[] { "Ultima operazione non salvata (" + type.toLowerCase(java.util.Locale.ROOT) + ")",
+            "Il PC si è spento mentre la scriveva: controlla export e copie qui sotto." };
+    }
+
     /** A damaged day never closes the normal way: it is set aside, after a question only the mouse answers. */
     private void setAsideDamagedDay(Day d) {
         if (!SafeConfirm.ask(this,
@@ -354,12 +378,8 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
                 .action("Ok", false, true, this::focusScan));
         }
         if (d != null && d.replay() != null && d.replay().hasDiscardedTail()) {
-            Journal.Replay r = d.replay();
-            String what = r.discardedLabel == null ? "una riga incompleta"
-                        : r.discardedLabel + (r.discardedLot == null ? "" : "  -  " + r.discardedLot);
-            addBanner(new Banner(AppTheme.PEACH, "Ultima coppia scartata: " + what,
-                "Il PC si è spento mentre la scriveva: sparala di nuovo.")
-                .action("Ok", false, true, this::focusScan));
+            String[] b = discardBanner(d.replay());
+            addBanner(new Banner(AppTheme.PEACH, b[0], b[1]).action("Ok", false, true, this::focusScan));
         }
         for (String name : ledger.recovered()) {
             addBanner(new Banner(AppTheme.BLUE, "Export recuperato: " + name,
