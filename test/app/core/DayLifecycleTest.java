@@ -113,9 +113,46 @@ public final class DayLifecycleTest {
         check("nor the folder the footer shows", blocked.dataDir().equals(oldData));
         cfg.set(Settings.DIR_DATA, "");
 
+        damagedDay_isSetAside_andTheNextDayKeepsCounting(home, cfg);
+
         System.out.println();
         System.out.println(passed + " passed, " + failed + " failed");
         if (failed > 0) System.exit(1);
+    }
+
+    // a journal broken in the middle opens read only. the station must not stay
+    // stuck on it: once its readable rows are handed over, closing sets it
+    // aside, and the next day continues the numbers past everything in the
+    // file, the unreadable part included, so no row or export number comes back
+    private static void damagedDay_isSetAside_andTheNextDayKeepsCounting(File home, Settings cfg)
+            throws Exception {
+        cfg.set(Settings.DIR_DATA, new File(home, "danneggiata").getPath());
+        TestClock c = new TestClock("2026-10-14T07:00:00", 1000);
+        Ledger l = new Ledger(cfg, c);
+        l.open();
+        for (int i = 1; i <= 6; i++) l.add(P + "5" + i, "LOT-A");
+        l.export(false);
+        File f = l.day().file();
+        l.day().journal().close();
+        byte[] all = Files.readAllBytes(f.toPath());
+        String t = new String(all, java.nio.charset.StandardCharsets.UTF_8);
+        int third = t.indexOf('\n', t.indexOf('\n') + 1) + 1;
+        all[third + 1] ^= 1;   // line 3 broken, everything after it intact
+        Files.write(f.toPath(), all);
+
+        Ledger again = new Ledger(cfg, c);
+        again.open();
+        check("the damaged day opens read only", again.day() != null && again.day().isCorrupted());
+        check("closing sets the damaged day aside", again.closeDay().ok() && again.day() == null);
+        check("the folder no longer counts it as open", again.days().openDay() == null);
+        Day.Result next = again.add(P + "60", "LOT-B");
+        check("the next pair opens a new day", next.ok() && again.day() != null
+              && again.day().file().getName().equals("2026-10-14_2.giornale"));
+        check("its rows continue past the damaged part (7, not 2)", again.day().row(7) != null);
+        check("its exports continue past the damaged part (2, not 1)", again.day().nextExportNumber() == 2);
+        check("the damaged file is still there, untouched but for the closing line",
+              f.exists() && Files.size(f.toPath()) > all.length);
+        cfg.set(Settings.DIR_DATA, "");
     }
 
     static void check(String name, boolean cond) {

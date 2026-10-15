@@ -259,7 +259,7 @@ public final class ScanPanel extends JPanel {
     private String blockedDetail() {
         if (!app.core.StationRule.valid(ledger.station())) return "imposta il nome della postazione nelle Impostazioni";
         if (!ledger.diskOk()) return "riprovo da solo ogni 2 secondi: " + ledger.diskError();
-        return "il giornale è danneggiato: esporta le righe leggibili";
+        return "esporta, poi Chiudi giornata";
     }
 
     private void refuse(Pending kind, Color tone, String head, String detail) {

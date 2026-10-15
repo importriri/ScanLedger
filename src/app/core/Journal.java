@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.zip.CRC32;
 
@@ -365,6 +366,64 @@ public final class Journal implements Closeable {
             }
         }
         return r;
+    }
+
+    /**
+     * Every line that still decodes, the ones after a broken line included,
+     * read only for the numbers they used: {highest row n, highest export}.
+     * Never applied to a model — a missing line in the middle could be an edit
+     * or a deletion — only so a later day of the same date cannot hand out a
+     * row or export number that already went out.
+     */
+    public static int[] highestNumbers(File file) throws IOException {
+        byte[] all = Files.readAllBytes(file.toPath());
+        int maxN = 0, maxExport = 0;
+        for (String line : lenient(all, 0, all.length).split("\n")) {
+            Event e = decode(line);
+            if (e == null) continue;
+            try {
+                switch (e.type) {
+                    case APRI:
+                        maxN = Math.max(maxN, Integer.parseInt(e.field(2)));
+                        maxExport = Math.max(maxExport, Integer.parseInt(e.field(3)));
+                        break;
+                    case AGGIUNGI:
+                        maxN = Math.max(maxN, Integer.parseInt(e.field(0)));
+                        break;
+                    case INTERVALLO:
+                        maxN = Math.max(maxN, Integer.parseInt(e.field(0))
+                                              + e.field(2).split("\\|", -1).length - 1);
+                        break;
+                    case ESPORTA:
+                        maxExport = Math.max(maxExport, Integer.parseInt(e.field(0)));
+                        break;
+                    default:
+                        break;
+                }
+            } catch (RuntimeException ignored) {
+                // a line that decodes but does not parse adds nothing
+            }
+        }
+        return new int[] { maxN, maxExport };
+    }
+
+    /**
+     * Sets a damaged journal aside: one CHIUDI line at the end, forced, and
+     * nothing else touched. The replay still stops at the broken line, but the
+     * folder sees the day as closed, so the next pair starts a new one.
+     */
+    public static void appendClosing(File file, Clock clock) throws IOException {
+        Event e = new Event(0, LocalDateTime.now(clock).format(TS), Event.Type.CHIUDI,
+                            Collections.<String>emptyList());
+        byte[] all = Files.readAllBytes(file.toPath());
+        boolean needsNewline = all.length > 0 && all[all.length - 1] != '\n';
+        byte[] line = ((needsNewline ? "\n" : "") + encode(e)).getBytes(StandardCharsets.UTF_8);
+        try (FileChannel c = FileChannel.open(file.toPath(), StandardOpenOption.WRITE,
+                                              StandardOpenOption.APPEND)) {
+            ByteBuffer buf = ByteBuffer.wrap(line);
+            while (buf.hasRemaining()) c.write(buf);
+            c.force(true);
+        }
     }
 
     /** Fields as a list, for callers building events. */

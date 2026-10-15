@@ -202,7 +202,11 @@ Al riavvio dopo uno spegnimento:
 
 Se il giornale risulta danneggiato a metà (non da uno spegnimento: da un disco
 guasto), il programma ne fa una copia accanto (`.corrotto-...`), apre la
-giornata in **sola lettura** e propone **Esporta righe leggibili**.
+giornata in **sola lettura** e propone **Esporta righe leggibili**. Il banner dice
+anche quante righe del giornale, dopo quella rotta, non è riuscito a leggere: sono
+nella copia, e vanno recuperate a mano. Dopo l'export, **Chiudi giornata** mette
+da parte la giornata danneggiata e la prossima coppia ne apre una nuova, che
+continua la numerazione.
 
 ## 8. Cosa NON fare
 
@@ -239,5 +243,5 @@ giornata in **sola lettura** e propone **Esporta righe leggibili**.
 | AutoFillSuite dice TRONCATO | Il file è arrivato a metà (chiavetta tolta): ricopialo, o **Rigenera**. |
 | File export cancellato per errore | Impostazioni > Storico > **Rigenera**: torna identico. |
 | La giornata di ieri è ancora aperta | Esportala e chiudila dal banner, o continua: le coppie nuove vanno lì finché è aperta. |
-| Giornale danneggiato: sola lettura | **Esporta righe leggibili**, poi chiudi la giornata. La copia del file danneggiato resta accanto al giornale. |
+| Giornale danneggiato: sola lettura | **Esporta righe leggibili**, poi **Chiudi giornata** (la mette da parte). Le righe non lette restano nella copia accanto al giornale: falle recuperare. |
 | Il programma non parte: «già aperto» | C'è già un Registro QR aperto su questa cartella dati: usa quello. |

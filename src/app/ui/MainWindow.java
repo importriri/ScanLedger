@@ -254,7 +254,8 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
         }
         footRight.setText(right);
         footRight.setForeground(right.contains("SOSPESO") ? AppTheme.YELLOW : AppTheme.OVERLAY);
-        boolean writable = d != null && !d.isReadOnly();
+        // a damaged day is closed by setting it aside, once its rows are handed over
+        boolean writable = d != null && (!d.isReadOnly() || (d.isCorrupted() && !d.isClosed()));
         if (btnExport != null) {
             btnExport.setEnabled(ledger.diskOk() && d != null
                                  && (d.isCorrupted() || !d.pendingExport().isEmpty()));
@@ -272,7 +273,12 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
 
     void closeDay() {
         Day d = ledger.day();
-        if (d == null || d.isReadOnly()) return;
+        if (d == null) return;
+        if (d.isCorrupted()) {
+            setAsideDamagedDay(d);
+            return;
+        }
+        if (d.isReadOnly()) return;
         int nw = d.pendingNew(), corr = d.pendingCorrections();
         // both questions answer No to the keyboard: the next scan's ENTER must
         // not close the day (or open the export) behind the operator's back
@@ -303,14 +309,40 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
         focusScan();
     }
 
+    /** A damaged day never closes the normal way: it is set aside, after a question only the mouse answers. */
+    private void setAsideDamagedDay(Day d) {
+        if (!SafeConfirm.ask(this,
+                "Mettere da parte la giornata danneggiata del " + ExportDialog.dm(d.date()) + "?\n"
+                + "Prima esporta le righe leggibili (Esporta righe leggibili).\n"
+                + "Il file resta nella cartella giornate con la sua copia; la prossima coppia "
+                + "apre una giornata nuova.", "Chiudi giornata")) {
+            focusScan();
+            return;
+        }
+        Day.Result r = ledger.closeDay();
+        if (r.ok()) {
+            Sounds.ok();
+            clearDayBanners();
+        } else {
+            Sounds.error();
+            tablePanel.problem(r.message);
+        }
+        focusScan();
+    }
+
     /** What the start found: a restart after a crash, a torn line, a recovered export, old days. */
     private void startupBanners() {
         Day d = ledger.day();
         if (d != null && d.isCorrupted()) {
             Journal.Replay r = d.replay();
-            addBanner(new Banner(AppTheme.RED, "Giornale danneggiato: giornata in sola lettura",
-                "Copia del file in " + (r.corruptCopy == null ? "-" : r.corruptCopy.getName())
-                + ". Si leggono " + d.rowCount() + " righe: esportale, poi chiudi.")
+            int unread = unreadLines(d);
+            int rows = d.rowCount();
+            String copy = r.corruptCopy == null ? "-" : r.corruptCopy.getName();
+            addBanner(new Banner(AppTheme.RED, "Giornale danneggiato, sola lettura — "
+                + rows + (rows == 1 ? " riga letta" : " righe lette")
+                + (unread > 0 ? ", " + unread + " righe del giornale NON lette" : ""),
+                (unread > 0 ? "Le righe non lette restano in " : "Copia del file in ") + copy
+                + ". Esporta le righe leggibili, poi Chiudi giornata.")
                 .action("Esporta righe leggibili", true, false, () -> openExport(true)));
         }
         if (uncleanExit && d != null && !d.isCorrupted()) {
@@ -352,6 +384,18 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
             }
         }
         refreshCopyBanner();
+    }
+
+    /** Journal lines past the broken one: events the read-only day does not show. */
+    private static int unreadLines(Day d) {
+        try {
+            byte[] all = java.nio.file.Files.readAllBytes(d.file().toPath());
+            int lines = 0;
+            for (byte b : all) if (b == '\n') lines++;
+            return Math.max(0, lines - d.eventCount() - 1);
+        } catch (java.io.IOException | RuntimeException e) {
+            return 0;
+        }
     }
 
     private void addBanner(Banner b) {

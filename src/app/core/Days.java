@@ -117,9 +117,16 @@ public final class Days {
         Map<String, Integer> earlier = new HashMap<>();
         for (Info i : list()) {
             if (!i.date.equals(date) || i.k >= k) continue;
-            Day prev = Day.replayOnly(Journal.read(i.file).events);
+            Journal.Replay rr = Journal.read(i.file);
+            Day prev = Day.replayOnly(rr.events);
             nBase = Math.max(nBase, prev.maxN());
             exportBase = Math.max(exportBase, prev.lastExportNumber());
+            if (rr.corrupted) {
+                // a damaged day set aside: its unreadable part used numbers too
+                int[] hi = Journal.highestNumbers(i.file);
+                nBase = Math.max(nBase, hi[0]);
+                exportBase = Math.max(exportBase, hi[1]);
+            }
             for (Row r : prev.rows()) if (!r.deleted()) earlier.put(r.label(), r.n);
         }
         return new Day.Init(station, date, nBase, exportBase, earlier);

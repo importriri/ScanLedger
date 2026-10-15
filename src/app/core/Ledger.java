@@ -95,7 +95,7 @@ public final class Ledger {
     /** Closes the day. On success there is no current day until the next scan. */
     public Day.Result closeDay() {
         if (day == null) return Day.Result.refused("Nessuna giornata aperta");
-        Day.Result r = day.close();
+        Day.Result r = day.isCorrupted() ? day.setAside(clock) : day.close();
         if (r.ok()) {
             if (day.journal() != null) day.journal().close();
             day = null;

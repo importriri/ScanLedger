@@ -200,7 +200,11 @@ After a restart that follows a power cut:
 
 If the journal turns out damaged in the middle (not by a power cut: by a
 failing disk), the program keeps a copy next to it (`.corrotto-...`), opens the
-day **read-only** and offers **Esporta righe leggibili**.
+day **read-only** and offers **Esporta righe leggibili**. The banner also says
+how many journal lines after the broken one it could not read: they are in the
+copy and have to be recovered by hand. After the export, **Chiudi giornata** sets
+the damaged day aside and the next pair opens a new one, which continues the
+numbering.
 
 ## 8. What NOT to do
 
@@ -238,5 +242,5 @@ day **read-only** and offers **Esporta righe leggibili**.
 | AutoFillSuite says TRONCATO | The file arrived cut (USB stick pulled out): copy it again, or **Rigenera**. |
 | Export file deleted by mistake | Impostazioni > Storico > **Rigenera**: it comes back identical. |
 | Yesterday's day is still open | Export it and close it from the banner, or carry on: new pairs go there while it is open. |
-| Damaged journal: read-only | **Esporta righe leggibili**, then close the day. The copy of the damaged file stays next to the journal. |
+| Damaged journal: read-only | **Esporta righe leggibili**, then **Chiudi giornata** (it sets the day aside). The unread lines stay in the copy next to the journal: have them recovered. |
 | The program does not start: «già aperto» | A Registro QR is already open on this data folder: use that one. |

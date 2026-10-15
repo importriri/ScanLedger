@@ -444,6 +444,23 @@ public final class Day {
                      ok ? "OK" : "FALLITA", reason == null ? "" : clean(reason));
     }
 
+    /**
+     * A damaged day cannot record anything, so it can never close the normal
+     * way: it is set aside instead (see {@link Journal#appendClosing}). Its
+     * readable rows are handed over first, as a re-export.
+     */
+    public Result setAside(Clock clock) {
+        if (!corrupted) return Result.refused("Solo una giornata danneggiata si mette da parte");
+        if (closed) return Result.unchanged("Giornata già messa da parte");
+        try {
+            Journal.appendClosing(file, clock);
+        } catch (IOException e) {
+            return Result.io(e);
+        }
+        closed = true;
+        return Result.ok(null);
+    }
+
     /** Archives the day. Only with nothing left to export. */
     public Result close() {
         Result pre = writable();
