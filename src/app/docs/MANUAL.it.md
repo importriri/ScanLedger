@@ -109,8 +109,10 @@ Lotto nel campo **Primo**: riquadro giallo **CODICI INVERTITI**, premi **F2**.
 
 ## 4. Correggere una riga
 
-Seleziona la riga in tabella e premi **Modifica (Invio)** o fai doppio click.
-**Elimina (Canc)** la toglie, **Ripristina** riporta una riga eliminata.
+Seleziona la riga in tabella con il mouse e premi **Modifica**, o fai doppio click.
+La tabella non prende mai il cursore: puoi continuare a sparare anche con una
+riga selezionata.
+**Elimina** la toglie, **Ripristina** riporta una riga eliminata.
 I filtri sopra la tabella (Tutte, Modificate, Eliminate, Esportate, Corrette) e
 la ricerca aiutano a trovarla.
 

@@ -90,8 +90,8 @@ public final class TablePanel extends JPanel {
         foot.setOpaque(false);
         JPanel btns = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         btns.setOpaque(false);
-        btnEdit = AppTheme.secondary("Modifica (Invio)", Icons.pencil(AppTheme.ICON, AppTheme.SUBTEXT));
-        btnDelete = AppTheme.secondary("Elimina (Canc)", Icons.cross(AppTheme.ICON, AppTheme.RED));
+        btnEdit = AppTheme.secondary("Modifica", Icons.pencil(AppTheme.ICON, AppTheme.SUBTEXT));
+        btnDelete = AppTheme.secondary("Elimina", Icons.cross(AppTheme.ICON, AppTheme.RED));
         btnRestore = AppTheme.secondary("Ripristina", Icons.restore(AppTheme.ICON, AppTheme.SUBTEXT));
         btnEdit.addActionListener(e -> act(0));
         btnDelete.addActionListener(e -> act(1));
@@ -298,23 +298,11 @@ public final class TablePanel extends JPanel {
             }
         });
 
-        // Enter and Canc: only while the table itself has the focus
-        InputMap im = table.getInputMap(JComponent.WHEN_FOCUSED);
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "rowEdit");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0), "rowDelete");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "back");
-        table.getActionMap().put("rowEdit", new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent e) { act(0); }
-        });
-        table.getActionMap().put("rowDelete", new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent e) {
-                Row r = selected();
-                act(r != null && r.deleted() ? 2 : 1);
-            }
-        });
-        table.getActionMap().put("back", new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent e) { actions.focusScan(); }
-        });
+        // the table never takes the focus: a row clicked to look at it would
+        // otherwise receive the next scan, and the scanner's ENTER opened the
+        // edit dialog on that row while the codes rewrote it. Selection is the
+        // mouse's; the caret stays where the next piece will be scanned.
+        table.setFocusable(false);
 
         JScrollPane sc = new JScrollPane(table);
         sc.setPreferredSize(new Dimension(560, 200));

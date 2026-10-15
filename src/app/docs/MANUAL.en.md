@@ -108,8 +108,9 @@ A lot in the **Primo** field: yellow box **CODICI INVERTITI**, press **F2**.
 
 ## 4. Correcting a row
 
-Select the row in the table and press **Modifica (Invio)** or double-click it.
-**Elimina (Canc)** removes it, **Ripristina** brings a deleted row back. The
+Select the row in the table with the mouse and press **Modifica**, or double-click
+it. The table never takes the caret: you can keep scanning with a row selected.
+**Elimina** removes it, **Ripristina** brings a deleted row back. The
 filters above the table (Tutte, Modificate, Eliminate, Esportate, Corrette) and
 the search help you find it.
 

@@ -74,17 +74,17 @@ chiavetta**: le righe di controllo di impronta e righe devono essere verdi.
 
 ## 3. Correzione di un lotto dopo l'export
 
-1. In tabella, scegliere una riga **ESPORTATA** e premere **Modifica (Invio)**.
+1. In tabella, scegliere una riga **ESPORTATA** e premere **Modifica**.
 2. Il campo Etichetta è bloccato ("l'etichetta non si cambia: è già
    registrata"). Cambiare il **lotto** e premere **Salva correzione**.
-3. Provare anche **Elimina (Canc)** sulla stessa riga.
+3. Guardare il tasto **Elimina** con la stessa riga selezionata.
 4. Premere **Esporta CSV**, poi **Esporta**.
 
 Deve succedere:
 
 - dopo il passo 2 la riga dice **CORRETTA**, con il lotto nuovo;
-- al passo 3 il programma rifiuta: la riga è già sul portale, si toglie solo
-  con Delete item sul portale;
+- al passo 3 **Elimina** è spento, e sotto la tabella si legge che la riga si
+  corregge solo nel lotto (è già sul portale: si toglie solo con Delete item);
 - il riepilogo del passo 4 dice **Correzioni di righe già esportate: 1**;
 - il file nuovo (`..._02.csv` o successivo) contiene **solo** quella riga, con
   tipo `CORREZIONE`, il lotto nuovo e, nell'ultima colonna, il lotto
