@@ -200,9 +200,16 @@ public final class Exporter {
         }
         Day.Result rec = day.recordExport(number, created, out.sha256, name, reexport, ns);
         if (!rec.ok()) {
-            // the file is valid and stays: at the next start it is found and recorded
-            return new Result(false, "File scritto ma il giornale non l'ha registrato (" + rec.message
-                              + "): verrà recuperato al prossimo avvio", target, lines, "", "", number, out.sha256);
+            // the journal does not know this file, and nothing has left the
+            // station yet (the copy comes after the event): take it back. Left
+            // there, it would block every later export of the day as soon as one
+            // more pair changed what is pending. Only a power cut leaves such a
+            // file behind, and recoverMissing handles that one.
+            boolean gone = target.delete();
+            return new Result(false, "Il giornale non ha registrato l'export (" + rec.message + "): "
+                              + (gone ? "file tolto, le righe restano da esportare"
+                                      : "il file " + name + " è rimasto nell'archivio, toglilo a mano"),
+                              null, lines, "", "", number, out.sha256);
         }
         String[] copy = copyOne(day, number, target);
         return new Result(true, "Esportato " + name, target, lines, copy[0], copy[1], number, out.sha256);

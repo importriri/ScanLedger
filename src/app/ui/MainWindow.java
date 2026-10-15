@@ -256,7 +256,8 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
         footRight.setForeground(right.contains("SOSPESO") ? AppTheme.YELLOW : AppTheme.OVERLAY);
         boolean writable = d != null && !d.isReadOnly();
         if (btnExport != null) {
-            btnExport.setEnabled(d != null && (d.isCorrupted() || !d.pendingExport().isEmpty()));
+            btnExport.setEnabled(ledger.diskOk() && d != null
+                                 && (d.isCorrupted() || !d.pendingExport().isEmpty()));
             btnCloseDay.setEnabled(writable);
         }
     }

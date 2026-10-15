@@ -29,6 +29,7 @@ public final class ExporterTest {
         readOnlyDay_exportsReadableRows_withoutRecording();
         recoveredExport_isCopied_toTheCopyFolder();
         exportRecordedWithoutCopyEvent_isCopiedAtStart();
+        unrecordedExport_leavesNoFile_thatBlocksTheNextOne();
 
         System.out.println();
         System.out.println(passed + " passed, " + failed + " failed");
@@ -261,6 +262,27 @@ public final class ExporterTest {
         y.copyNeverTried(again);
         check("an export of the open day that was never copied is copied at start",
               new File(stick, r.file.getName()).exists() && "OK".equals(again.export(1).copyOutcome()));
+    }
+
+    private static void unrecordedExport_leavesNoFile_thatBlocksTheNextOne() throws Exception {
+        File dir = tmp();
+        TestClock c = new TestClock("2026-10-13T07:00:00", 1000);
+        Day d = new Days(dir, c).createNew("L2");
+        d.add(P + "01", "LOT-A");
+        Exporter x = new Exporter(new File(dir, "export"), null, c);
+        // the journal stops writing between the file and its event
+        x.afterRename = () -> d.journal().close();
+        Exporter.Result r = x.export(d);
+        File f = new File(dir, "export/" + CsvWriter.fileName("L2", "2026-10-13", 1));
+        check("an export the journal could not record is a failure", !r.ok);
+        check("its file does not stay in the archive", !f.exists());
+
+        // the disk is back, the operator scans one more pair and exports again
+        Day again = Day.open(d.file(), new Day.Init("L2", "2026-10-13", 0, 0), c);
+        again.add(P + "02", "LOT-A");
+        Exporter.Result next = new Exporter(new File(dir, "export"), null, c).export(again);
+        check("the next export goes through as number 1 with both rows",
+              next.ok && read(next.file).exportNumber() == 1 && read(next.file).rows.size() == 2);
     }
 
     static void check(String name, boolean cond) {

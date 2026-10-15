@@ -69,6 +69,12 @@ public final class Ledger {
     public Exporter.Result export(boolean reexport) {
         Exporter x = exporter();
         Exporter.Result r = reexport ? x.reexport(day) : x.export(day);
+        Journal j = day == null ? null : day.journal();
+        if (j != null && j.isBroken()) {
+            // the event did not reach the disk: the pill turns red, the probe takes over
+            diskOk = false;
+            diskError = r.message;
+        }
         retryAllCopies();
         fire();
         return r;
