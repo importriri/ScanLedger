@@ -17,6 +17,7 @@ public final class Ledger {
 
     private final Settings cfg;
     private final Clock clock;
+    private final File dataDir;
     private final Days days;
     private Day day;
     private boolean diskOk = true;
@@ -29,7 +30,10 @@ public final class Ledger {
     public Ledger(Settings cfg, Clock clock) {
         this.cfg = cfg;
         this.clock = clock;
-        this.days = new Days(cfg.dataDir(), clock);
+        // the data folder is read once: a change in the settings counts from the
+        // next start (the lock, the journals and the default archive all live there)
+        this.dataDir = cfg.dataDir();
+        this.days = new Days(dataDir, clock);
     }
 
     /** What the start found, for the banners. */
@@ -69,7 +73,8 @@ public final class Ledger {
 
     /** A fresh exporter: the folders may have changed in the settings. */
     public Exporter exporter() {
-        return new Exporter(cfg.exportDir(), cfg.copyDir(), clock);
+        String exp = cfg.get(Settings.DIR_EXPORT, "").trim();
+        return new Exporter(exp.isEmpty() ? new File(dataDir, "export") : new File(exp), cfg.copyDir(), clock);
     }
 
     /** Incremental export (or the whole day again), then everyone hears about it. */
@@ -157,7 +162,7 @@ public final class Ledger {
     public boolean diskOk()         { return diskOk; }
     public String diskError()       { return diskError; }
     public long lastSavedMillis()   { return lastSavedMillis; }
-    public File dataDir()           { return cfg.dataDir(); }
+    public File dataDir()           { return dataDir; }
 
     public String station() {
         return cfg.get(Settings.STATION, "").trim();

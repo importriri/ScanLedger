@@ -103,6 +103,16 @@ public final class DayLifecycleTest {
         check("and the next pair lands in it", blocked.add(P + "05", "LOT-D").ok()
               && blocked.day().file().equals(open));
 
+        // the data folder changed in the settings: it counts from the next start,
+        // and the exports of this run stay next to this run's journals
+        File oldExport = blocked.exporter().exportDir();
+        File oldData = blocked.dataDir();
+        cfg.set(Settings.DIR_DATA, new File(home, "altrove").getPath());
+        check("a new data folder does not move this run's exports",
+              blocked.exporter().exportDir().equals(oldExport));
+        check("nor the folder the footer shows", blocked.dataDir().equals(oldData));
+        cfg.set(Settings.DIR_DATA, "");
+
         System.out.println();
         System.out.println(passed + " passed, " + failed + " failed");
         if (failed > 0) System.exit(1);

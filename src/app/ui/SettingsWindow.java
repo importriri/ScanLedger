@@ -153,7 +153,8 @@ public class SettingsWindow extends JDialog {
         Page p = new Page();
         p.section("Cartelle");
         folderRow(p, "Dati", Settings.DIR_DATA, Settings.defaultDataDir().getPath(),
-                  "giornale delle giornate e archivio. Vale dal prossimo avvio.");
+                  "giornale delle giornate e archivio. Vale dal prossimo avvio; le giornate "
+                  + "già registrate restano nella cartella di prima.");
         folderRow(p, "Export", Settings.DIR_EXPORT, "<dati>" + File.separator + "export",
                   "archivio dei CSV: il programma non cancella mai un file");
         folderRow(p, "Copia", Settings.DIR_COPY, "(nessuna)",
