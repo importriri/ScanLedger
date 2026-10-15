@@ -20,6 +20,8 @@ public final class Ledger {
     private final Days days;
     private Day day;
     private boolean diskOk = true;
+    /** the open day exists and could not be read: retried by {@link #probe} */
+    private boolean openFailed;
     private String diskError = "";
     private long lastSavedMillis;
     private final List<Runnable> listeners = new ArrayList<>();
@@ -42,10 +44,15 @@ public final class Ledger {
         try {
             day = days.openCurrent(station());
             if (day != null && day.file() != null) lastSavedMillis = day.file().lastModified();
+            openFailed = false;
         } catch (IOException e) {
+            // the open day is there and cannot be read (an antivirus, a backup
+            // holding it): wait for it. Starting another day beside it would
+            // leave its rows open, unexported, and on no screen.
+            openFailed = true;
             diskOk = false;
-            diskError = e.getMessage();
-            return e.getMessage();
+            diskError = "giornata aperta illeggibile: " + e.getMessage();
+            return diskError;
         }
         if (day != null) {
             recovered.addAll(exporter().recoverMissing(day));
@@ -203,6 +210,15 @@ public final class Ledger {
     public boolean probe() {
         if (diskOk) return true;
         boolean ok;
+        if (openFailed) {
+            ok = open() == null;
+            if (ok) {
+                diskOk = true;
+                diskError = "";
+                fire();
+            }
+            return ok;
+        }
         if (day != null && day.journal() != null) {
             ok = day.journal().probe();
         } else {

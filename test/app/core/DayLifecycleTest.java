@@ -80,6 +80,24 @@ public final class DayLifecycleTest {
               again.add(P + "01", "LOT-A").ok());
         check("the archive kept every file", Arrays.asList(cfg.exportDir().list()).size() == 3);
 
+        // the open day cannot be read at the start (an antivirus holds it):
+        // the station waits for it, it never starts a second day beside it
+        File open = again.day().file();
+        again.day().journal().close();
+        check("the test can make the journal unreadable", open.setReadable(false) && !open.canRead());
+        Ledger blocked = new Ledger(cfg, c);
+        String why = blocked.open();
+        check("a start that cannot read the open day says so", why != null && !blocked.diskOk());
+        check("the folder alone does not clear the error", !blocked.probe());
+        Day.Result held = blocked.add(P + "05", "LOT-D");
+        check("no pair is taken while the open day is unreadable", !held.ok() && blocked.day() == null);
+        check("no second day is started beside it", !new File(open.getParentFile(), "2026-10-13_3.giornale").exists());
+        open.setReadable(true);
+        check("once readable, the retry opens the same day", blocked.probe()
+              && blocked.day() != null && blocked.day().file().equals(open));
+        check("and the next pair lands in it", blocked.add(P + "05", "LOT-D").ok()
+              && blocked.day().file().equals(open));
+
         System.out.println();
         System.out.println(passed + " passed, " + failed + " failed");
         if (failed > 0) System.exit(1);
