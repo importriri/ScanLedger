@@ -53,6 +53,9 @@ java -cp out app.ui.ScanTabSupportTest
 java -cp out app.ui.TextFitTest
 java -cp out app.ui.StartupSmokeTest
 java -cp out app.ui.StartupSmokeTest --saved
+# Windows display scaling: nothing may clip at 125% or 150%
+java -Dsun.java2d.uiScale=1.25 -cp out app.ui.StartupSmokeTest
+java -Dsun.java2d.uiScale=1.5 -cp out app.ui.StartupSmokeTest --saved
 # pictures of the screens, to look at: out/snapshot/*.png
 java -cp out app.ui.Snapshot mocha out/snapshot
 java -cp out app.ui.Snapshot latte out/snapshot

@@ -46,6 +46,30 @@ does not matter.
 - A failed write is rolled back (truncated to the last good length) and the
   journal refuses further writes until a probe succeeds: a half line followed
   by good lines would turn a shutdown into corruption.
+- The torn-line banner names what the line was: a pair or a range to scan
+  again, an edit or a deletion of row n to redo (scanning the label again
+  would only give a duplicate).
+- A damaged copy is made once per damage: an identical `.corrotto-` file is
+  reused.
+
+### A damaged day is set aside, not left blocking the station
+
+A read-only day can record nothing, so it can never close the normal way.
+**Chiudi giornata** on it (after a question only the mouse answers) appends a
+single CHIUDI line and touches nothing else: the replay still stops at the
+broken line, but the folder now sees the day as closed and the next pair
+starts a new one. That day continues the numbers past **every line that still
+decodes** (`Journal.highestNumbers`), the unreadable part included — those
+lines are read for their numbers only, never applied — so no row or export
+number that went out can come back. The banner says how many journal lines
+were not read; they stay in the copy.
+
+### An open day that cannot be read at start
+
+If the open day exists but cannot be read (an antivirus or a backup holding
+it), the start reports it and the two-second probe retries **opening that
+day**. Nothing is recorded meanwhile: starting another day beside it would
+leave its rows open, unexported and on no screen.
 
 ### One instance
 
@@ -59,7 +83,10 @@ in the same process would otherwise release the first.
 
 The portal is append-only and **the last registration of a label wins**. So:
 
-- a label already alive in the day is a duplicate (with the row that holds it);
+- a label already alive in the day is a duplicate (with the row that holds it),
+  and so is a label still alive in an earlier day of the **same date** (`_1`
+  when this is `_2`): the CSV carries the same date and AutoFillSuite registers
+  them as one day;
   a range with a single duplicate is refused whole — one `INTERVALLO` event,
   all rows or none;
 - a row never exported can change label and lot;
@@ -77,7 +104,11 @@ The portal is append-only and **the last registration of a label wins**. So:
 was opened and stays open until closed, past midnight included (shifts). A day
 reopened on the same date (`_2`, `_3`...) continues the row and export numbers
 of the earlier ones, so `(station, date, export)` stays unique for AutoFillSuite
-and a row number never comes back meaning a different row.
+and a row number never comes back meaning a different row. The earlier days
+also hand over their live labels, for the duplicate rule.
+
+The data folder is read **once per run** (`Ledger`): a change in the settings
+counts from the next start, journals, lock and default archive together.
 
 ## Export, archive, backup
 
@@ -89,9 +120,17 @@ recoverable:
 3. the file **read back** with `CsvReader`: valid and exactly those rows, or it
    is deleted and nothing is recorded;
 4. the `ESPORTA` event: the rows become exported;
-5. the copy folder (and the day journal with it), with a `COPIA` event either
-   way. A failed copy stays **pending** and is retried at every start and every
-   export, on screen until it succeeds.
+5. the copy folder (and the day journal with it), each through a forced
+   temporary file and a rename, with a `COPIA` event either way. A failed copy
+   stays **pending** and is retried at every start and every export, on screen
+   until it succeeds. An export of the open day with **no** copy event at all
+   (recovered at start, or the PC went off between the export event and the
+   copy) is copied at start.
+
+If the journal cannot record the export event (step 4 fails), the file is
+removed again: nothing has left the station yet, and a file the journal does
+not know would block every later export of the day. The disk pill turns red
+and Esporta waits for the disk.
 
 **The gap between 2 and 4.** If the PC goes off after the rename and before the
 event, the file exists and the journal does not know it. At the next start
@@ -110,7 +149,9 @@ recorded, otherwise the journal does not match what went out and that is a
 serious error.
 
 **Re-export.** Every live row with its current value, all `NUOVA`,
-`riesportazione=1`, a new number, no state change. A closed day still records
+`riesportazione=1`, a new number, no state change. Refused while some live
+row was never exported: since nothing changes state, such a row would reach
+the portal and still be deletable and relabelable here. A closed day still records
 a re-export and a late copy (its rows stay frozen). A damaged, read-only day
 exports its readable rows as a re-export it cannot record.
 
@@ -150,8 +191,20 @@ MainWindow
   scanner has its keystrokes already queued.
 - **Duplicates are always refused** in the day: a second row for the same label
   would be a silent correction on the portal. A lot is changed by editing.
-- **Enter and Canc** act on the table only while the table has the focus; every
-  action hands the caret back to QR 1. All buttons are `focusable(false)`.
+- **The table never takes the focus.** A row clicked to look at it kept the
+  focus, and the next scan's ENTER opened the edit dialog on that row while
+  the codes rewrote it. Rows are selected with the mouse and edited with the
+  buttons or a double click; every action hands the caret back to QR 1. All
+  buttons are `focusable(false)`.
+- **No modal window in the scanner's way.** Questions use `SafeConfirm`
+  (copied from AutoFillSuite): ENTER, SPACE and ESC answer No, Si takes the
+  mouse. Refusals of Elimina, Ripristina and Chiudi giornata are a red line
+  under the table, not a message box that would swallow QR 1.
+- **Range fields select their text on focus**, at once (the scanner's
+  keystrokes are already queued): the lot kept from the last range is
+  replaced by a lot scanned again, not glued to it. ENTER in the quantity is a
+  key binding, because the formatted field's own ENTER never reaches an
+  action listener.
 - **The disk pill** shows the time of the last forced write. A failed write
   turns it red ("DISCO NON SCRIVE"), scanning stops, and a probe runs every two
   seconds until the journal is writable again.
@@ -161,22 +214,27 @@ MainWindow
 
 ## Tests
 
-| Suite | What it pins down | Why it exists |
+Most suites exist because of a bug, found here or already paid for in
+AutoFillSuite; the right column names it, or says there was none.
+
+| Suite | What it pins down | The bug that created it |
 |---|---|---|
-| JournalTest | round trip of every event type; every edit rule; cut at every byte = exact prefix; corruption = read only + copy; lock | the promise "nothing lost however it is closed" |
-| CrashTest | 20 forced kills of a writing JVM: every confirmed pair is on disk, at most one more; 10 kills mid-export: every file has its event, every event its file | proves the promise with a real process kill |
+| JournalTest | round trip of every event type; every edit rule; cut at every byte = exact prefix; corruption = read only + one copy; torn-line types; lock | a second lock in the same process released the first (POSIX); a new `.corrotto-` copy at every start |
+| CrashTest | 20 forced kills of a writing JVM: every confirmed pair is on disk, at most one more; 10 kills mid-export: every file has its event, every event its file | the promise "nothing lost however it is closed", proven with a real kill |
 | RangesTest | moving digits, refusal past 999 | AutoFillSuite's 998 + 5 = 1000, 1001 |
-| RowTableModelTest | newest on top, every state word, filter counts, search; follows every event | — (the table is a view of the journal) |
-| ScanFlowTest | the real window driven like the scanner: ENTER, TAB, free-text lot, duplicate, inversion + F2, mismatch, range, Ctrl+Z, edits; table and journal checked after every step | a deferred clear that would have wiped the next QR 2 |
-| CsvWriterTest | the two contract samples rebuilt byte for byte from a day | — (the contract, shared with AutoFillSuite) |
+| RowTableModelTest | newest on top, every state word, filter counts, search; follows every event | none: written with the table, which is only a view of the journal |
+| ScanFlowTest | the real window driven like the scanner: ENTER, TAB, free-text lot, duplicate, inversion + F2, mismatch, range, Ctrl+Z, edits, torn-line banners, export preview; table and journal checked after every step | a deferred clear that would have wiped the next QR 2; "scan it again" after a torn edit; `#fine` wrapped out of the preview |
+| ScannerKeysTest | real keys through the X server: a scan after clicking a row, the range lot and quantity, the close-day question, a refusal | a scan that edited the clicked row; a doubled range lot; ENTER that closed the day; a pop-up that swallowed QR 1 |
+| CsvWriterTest | the two contract samples rebuilt byte for byte from a day | the contract, shared with AutoFillSuite |
 | CsvReaderTest | the five samples with their outcome; BOM, LF, format 2, columns, duplicate n, field rules | Excel resaving a file, a file cut in transit |
-| ExporterTest | incremental exports with corrections, read-back, no overwrite, pending copy retried, crash between rename and event, re-export, read-only day | the gap between the rename and the event |
+| ExporterTest | incremental exports with corrections, read-back, no overwrite, pending copy retried, crash between rename and event (and its copy), export the journal could not record, re-export rules, read-only day | the gap between the rename and the event; a recovered export never copied; an orphan file that blocked the day; a re-export that bypassed the portal rules |
 | RegenerateTest | three exports and a re-export rebuilt identical from the journal; a forged journal is refused | "if the operator loses the files, nothing is lost" |
-| DayLifecycleTest | first scan opens the day, closing, `_2`, past midnight, stale day, closed day takes copies and re-exports, restart | shifts across midnight |
+| DayLifecycleTest | first scan opens the day, closing, `_2`, past midnight, stale day, closed day takes copies and re-exports, restart, unreadable open day, same-date duplicates, data folder, damaged day set aside | a second day started beside an unreadable one; a `_1` label accepted again in `_2`; exports moved by a settings change; a damaged day that blocked the station |
 | ScanGuardTest | inversion vs mismatch (AutoFillSuite cases) | the lot scanned into QR 1 |
 | GlyphSafetyTest | no typed symbol in UI strings or manuals | empty boxes on Windows |
+| ManualRenderTest | the markdown reader and both manuals, inside the JAR | none here: copied with the manual pane from AutoFillSuite |
 | IconRenderTest | icons as pixels, the gear hub is a hole | a black disc from AlphaComposite.Clear |
 | SpinnerCommitTest | on-screen number = model number | "chose 20, printed 30" |
 | ScanTabSupportTest | TAB on the marked QR 2 = ENTER, nothing else; a third field breaks nothing | the scanner's TAB suffix |
 | TextFitTest | overflow keeps the tail | unreadable final digits |
-| StartupSmokeTest (x2) | the real app under Xvfb: station asked at first start, no clipping on both cards at default and minimum size, both themes, settings tabs, first scan creates the day | the range preview squashed to 1 px by a field sized by its text |
+| StartupSmokeTest (x2) | the real app under Xvfb: station asked at first start, no clipping on both cards at default and minimum size, both themes, every settings tab, the settings open with no field holding the caret, first scan creates the day; also run at 125% and 150% UI scale | the range preview squashed to 1 px by a field sized by its text; (AutoFillSuite) the NPE of a restored state on a half-built panel |
