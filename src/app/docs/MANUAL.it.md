@@ -41,7 +41,7 @@ Per ogni pezzo spari due QR: l'**etichetta** in **QR 1**, il **lotto** in
 
 1. Spara QR 1: il cursore passa da solo a QR 2.
 2. Spara QR 2: la coppia viene **scritta su disco** e solo dopo compare in
-   tabella, in cima. Suono acuto, riquadro verde **COPPIA REGISTRATA — #n**,
+   tabella, in cima. Suono acuto, riquadro verde **COPPIA REGISTRATA - #n**,
    campi vuoti, cursore di nuovo su QR 1.
 3. Il contatore **COPPIE OGGI** conta le righe vive della giornata.
 

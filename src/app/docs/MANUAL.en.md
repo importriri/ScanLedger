@@ -41,7 +41,7 @@ into **QR 2**.
 
 1. Scan QR 1: the caret moves to QR 2 by itself.
 2. Scan QR 2: the pair is **written to disk** and only then shows in the
-   table, at the top. High tone, green box **COPPIA REGISTRATA — #n**, fields
+   table, at the top. High tone, green box **COPPIA REGISTRATA - #n**, fields
    cleared, caret back on QR 1.
 3. The **COPPIE OGGI** counter counts the live rows of the day.
 

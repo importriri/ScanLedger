@@ -292,7 +292,7 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
             return;
         }
         if (!SafeConfirm.ask(this,
-                "Chiudere la giornata del " + ExportDialog.dm(d.date()) + " (" + d.liveCount() + " coppie)?\n"
+                "Chiudere la giornata del " + ExportDialog.dm(d.date()) + " (" + pairs(d.liveCount()) + ")?\n"
                 + "Diventa di sola lettura; la prossima coppia apre una giornata nuova.",
                 "Chiudi giornata")) {
             focusScan();
@@ -307,6 +307,10 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
             tablePanel.problem(r.message);
         }
         focusScan();
+    }
+
+    static String pairs(int n) {
+        return n + (n == 1 ? " coppia" : " coppie");
     }
 
     /** {title, detail} of the banner for a torn last line, by what the line was. */
@@ -372,7 +376,7 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
         if (uncleanExit && d != null && !d.isCorrupted()) {
             String last = d.lastEventTs().length() >= 19 ? d.lastEventTs().substring(11, 19) : "-";
             addBanner(new Banner(AppTheme.BLUE, "Ripresa giornata del " + ExportDialog.dm(d.date())
-                + " — " + d.liveCount() + " coppie, nessuna persa",
+                + " — " + pairs(d.liveCount()) + ", nessuna persa",
                 "Il programma non era stato chiuso normalmente (ultimo evento " + last
                 + "). Tabella ricostruita dal giornale: puoi continuare a sparare.")
                 .action("Ok", false, true, this::focusScan));
@@ -391,7 +395,7 @@ public class MainWindow extends JFrame implements TablePanel.Actions, ScanPanel.
             int pending = d.pendingExport().size();
             if (pending > 0) {
                 addBanner(new Banner(AppTheme.PEACH, "Il " + ExportDialog.dm(d.date())
-                    + " non è stato esportato: " + pending + " coppie",
+                    + " non è stato esportato: " + pairs(pending),
                     "Esporta prima di andare avanti, oppure tienilo per dopo: la giornata resta aperta.")
                     .action("Esporta " + ExportDialog.dm(d.date()), true, true, () -> openExport(false))
                     .action("Più tardi", false, true, this::focusScan));
