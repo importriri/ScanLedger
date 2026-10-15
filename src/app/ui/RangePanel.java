@@ -111,9 +111,16 @@ public final class RangePanel extends JPanel {
         });
         btnAdd.addActionListener(e -> { add(); tfFirst.requestFocusInWindow(); });
         btnUndo.addActionListener(e -> { undo(); tfFirst.requestFocusInWindow(); });
-        // ENTER in the quantity confirms the range
+        // ENTER in the quantity confirms the range. A key binding, not an action
+        // listener: the formatted field's own ENTER commits the number and never
+        // reaches the listener with a real key press.
         JFormattedTextField ed = ((JSpinner.DefaultEditor) spCount.getEditor()).getTextField();
-        ed.addActionListener(e -> add());
+        // and the number typed there replaces the one shown ("2" after "10" was 102)
+        selectAllOnFocus(ed);
+        ed.getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "addRange");
+        ed.getActionMap().put("addRange", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { add(); }
+        });
 
         getInputMap(WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
             .put(KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0), "swapRange");
@@ -128,6 +135,16 @@ public final class RangePanel extends JPanel {
             .put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "clearRange");
         getActionMap().put("clearRange", new AbstractAction() {
             @Override public void actionPerformed(ActionEvent e) { clearFields(); }
+        });
+    }
+
+    /** A field reached by the scanner's ENTER is overwritten by what comes next, never appended to. */
+    static void selectAllOnFocus(final JTextField f) {
+        f.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override public void focusGained(java.awt.event.FocusEvent e) {
+                // later: a formatted field puts its caret back after gaining the focus
+                SwingUtilities.invokeLater(f::selectAll);
+            }
         });
     }
 

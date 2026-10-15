@@ -109,7 +109,8 @@ public final class ScannerKeysTest {
         scan("2");
         settle(300);
         Day d = ledger.day();
-        Row r = d == null ? null : d.findLive(L + "00200");
+        Row r = d == null ? null : d.findLive(L + "00201");
+        check("the second range adds its two rows", liveCount() == before + 4);
         check("a lot scanned again replaces the lot on screen, it does not glue onto it",
               r != null && "900612202601310011".equals(r.lot()));
         SwingUtilities.invokeAndWait(() -> win.modeSelector.select(0));
